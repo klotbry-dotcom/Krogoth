@@ -124,11 +124,12 @@ button.warn { border-color: var(--red); color: var(--red); }
 'use strict';
 
 /* ================= constants ================= */
-const GW = 40, GH = 40;               // fine grid (cells)
-const NW = GW - 1, NH = GH - 1;       // enemy nodes (top-left of a 2x2 footprint)
-const SPAWN = [2, 2];
-const CPS = [[2, 19], [19, 19], [19, 2], [36, 2], [36, 19]];
-const REF = [19, 35];
+const GW = 40, GH = 40;               // fine grid (cells); enemies walk cell to cell, 1 cell is enough
+const NW = GW, NH = GH;
+// Crossing layout: the 1->2 and 3->4 legs both cut through the middle, so air waves pass the centre twice.
+const SPAWN = [3, 3];
+const CPS = [[3, 20], [36, 20], [20, 3], [20, 36], [36, 3]];
+const REF = [36, 36];
 const POINTS = [SPAWN, ...CPS, REF];
 const SPR = 16;                       // sprite pixels per 2x2 building
 const PX = 2 / SPR;                   // one sprite pixel in cells
@@ -176,8 +177,8 @@ function newGame() {
   reserved = new Uint8Array(GW * GH);
   pieces = new Map();
   nextId = 1;
-  for (const p of [SPAWN, ...CPS]) reserveArea(p[0], p[1], 2);
-  reserveArea(REF[0], REF[1], 3);
+  for (const p of [SPAWN, ...CPS]) reserveArea(p[0], p[1], 1);
+  reserveArea(REF[0], REF[1], 2);
   S = {
     wave: 1, lives: 20, gold: 10, odds: 0,
     phase: 'build', placed: 0, newIds: [],
@@ -191,17 +192,14 @@ function newGame() {
 
 const I = (x, y) => y * GW + x;
 function reserveArea(nx, ny, r) {
-  for (let y = ny - r + 1; y <= ny + r; y++)
-    for (let x = nx - r + 1; x <= nx + r; x++)
+  for (let y = ny - r; y <= ny + r; y++)
+    for (let x = nx - r; x <= nx + r; x++)
       if (x >= 0 && y >= 0 && x < GW && y < GH) reserved[I(x, y)] = 1;
 }
 
 /* ================= pathing ================= */
 function cellFree(x, y) { return x >= 0 && y >= 0 && x < GW && y < GH && occ[I(x, y)] === 0; }
-function nodeOK(x, y) {
-  return x >= 0 && y >= 0 && x < NW && y < NH &&
-    cellFree(x, y) && cellFree(x + 1, y) && cellFree(x, y + 1) && cellFree(x + 1, y + 1);
-}
+function nodeOK(x, y) { return cellFree(x, y); }
 const DIRS = [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1], [1, 1, 1.4142], [1, -1, 1.4142], [-1, 1, 1.4142], [-1, -1, 1.4142]];
 function findSeg(a, b) {
   if (!nodeOK(a[0], a[1]) || !nodeOK(b[0], b[1])) return null;
@@ -487,25 +485,41 @@ function sprMech(mi, f) {
   return out;
 }
 function sprScrap(v) {
-  const P = painter(SPR, SPR);
-  const C = ['#24272c', '#33373e', '#474c54', '#5a6069'];
-  const RUST = ['#5c321b', '#7d4523'];
+  // 3/4 view: each block shows a lit top face and a darker front face.
+  const P = painter(SPR, 20);
+  const TOP = ['#4f565f', '#5d656f'], FRONT = ['#2c3138', '#23272d'], RUST = ['#5c321b', '#7d4523'];
   let seed = 17 + v * 101;
   const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  const blocks = v === 0 ? [[2, 6, 6, 8], [7, 3, 7, 7], [5, 9, 8, 5]] :
-                 v === 1 ? [[2, 3, 5, 6], [6, 6, 8, 8], [2, 9, 5, 4]] :
-                           [[3, 2, 9, 5], [2, 7, 6, 7], [8, 8, 6, 6]];
-  for (const [bx, by, bw, bh] of blocks) {
-    for (let y = by; y < by + bh && y < 15; y++) for (let x = bx; x < bx + bw && x < 15; x++) {
-      let c = C[1 + ((x + y) % 2)];
-      if (y === by) c = C[3];
-      if (x === bx + bw - 1 || y === by + bh - 1) c = C[0];
-      if (rnd() < 0.12) c = RUST[(rnd() * 2) | 0];
+  const blocks = v === 0 ? [[1, 5, 8, 6, 4], [7, 2, 8, 6, 4], [3, 9, 10, 6, 4]] :
+                 v === 1 ? [[2, 3, 6, 6, 4], [8, 6, 7, 6, 4], [1, 9, 8, 6, 4]] :
+                           [[3, 2, 10, 7, 4], [1, 8, 6, 7, 4], [8, 9, 7, 6, 4]];
+  for (const [bx, by, bw, bt, bd] of blocks) {
+    for (let y = by; y < by + bt + bd && y < 20; y++) for (let x = bx; x < bx + bw && x < 16; x++) {
+      const top = y < by + bt;
+      let c = top ? TOP[(x + y) % 2] : FRONT[(y - by - bt) % 2];
+      if (top && y === by) c = '#6c747e';
+      if (!top && (x === bx || x === bx + bw - 1)) c = '#1c2025';
+      if (rnd() < 0.1) c = RUST[(rnd() * 2) | 0];
       P.set(x, y, c);
     }
   }
   return P.done();
 }
+function sprPlinth() {
+  // Low steel pedestal every tower stands on: top face rows 6-11, front face rows 12-14.
+  const P = painter(SPR, SPR);
+  for (let y = 6; y <= 14; y++) for (let x = 1; x <= 14; x++) {
+    let c;
+    if (y === 6) c = '#56606b';
+    else if (y <= 11) c = (x + y) % 2 ? '#3d4650' : '#414a55';
+    else c = y === 12 ? '#2b3138' : '#22272d';
+    if (y >= 12 && (x === 1 || x === 14)) c = '#191d22';
+    P.set(x, y, c);
+  }
+  P.set(3, 13, '#4a525c'); P.set(12, 13, '#4a525c');
+  return P.done();
+}
+
 const ENEMY_PAL = {
   ground: ['#3a0d1e', '#7a1f3d', '#c2315e', '#ff8aac'],
   fast:   ['#3d1a06', '#8f3b0c', '#e06a1d', '#ffb37a'],
@@ -555,6 +569,7 @@ const SPRITES = {};
 function buildSprites() {
   SPRITES.piece = METALS.map((_, mi) => [sprOre(mi), sprIngot(mi), sprRod(mi), sprBolt(mi), sprCore(mi), [sprMech(mi, 0), sprMech(mi, 1)]]);
   SPRITES.scrap = [sprScrap(0), sprScrap(1), sprScrap(2)];
+  SPRITES.plinth = sprPlinth();
   SPRITES.enemy = {
     ground: [sprCrawler('ground', 0), sprCrawler('ground', 1)],
     fast: [sprCrawler('fast', 0), sprCrawler('fast', 1)],
@@ -588,16 +603,16 @@ function buildFloor() {
   }
   // hazard pads around reserved areas
   const pad = (nx, ny, r, col) => {
-    const x0 = (nx - r + 1) * sc, y0 = (ny - r + 1) * sc, w = 2 * r * sc;
+    const x0 = (nx - r) * sc, y0 = (ny - r) * sc, w = (2 * r + 1) * sc;
     g.fillStyle = '#121518'; g.fillRect(x0, y0, w, w);
     for (let i = 0; i < w; i++) for (let j = 0; j < w; j++) {
       const edge = i < 3 || j < 3 || i >= w - 3 || j >= w - 3;
       if (edge && ((i + j) >> 2) % 2 === 0) { g.fillStyle = col; g.fillRect(x0 + i, y0 + j, 1, 1); }
     }
   };
-  pad(SPAWN[0], SPAWN[1], 2, '#7c4dd1');
-  for (const c of CPS) pad(c[0], c[1], 2, '#c9882b');
-  pad(REF[0], REF[1], 3, '#c9882b');
+  pad(SPAWN[0], SPAWN[1], 1, '#7c4dd1');
+  for (const c of CPS) pad(c[0], c[1], 1, '#c9882b');
+  pad(REF[0], REF[1], 2, '#c9882b');
 }
 
 /* ================= camera & canvas ================= */
@@ -716,7 +731,9 @@ function onTap(wx, wy) {
     renderPanel();
     return;
   }
-  S.sel = p ? p.id : null;
+  let q = p;
+  if (!q) { const r = pieceAt(wx, wy + 0.8); if (r && r.kind === 'tower' && wy >= r.y - 0.85) q = r; }
+  S.sel = q ? q.id : null;
   renderPanel();
 }
 
@@ -811,7 +828,7 @@ function spawnEnemy(kind) {
     air:    { hp: hp0 * 0.85, spd: 2.0, rew: 1 + Math.floor(n / 5), lives: 1 },
     boss:   { hp: hp0 * 14, spd: 1.25, rew: 15 + n, lives: 5 },
   }[kind];
-  const pts = air ? POINTS.map((p) => [p[0] + 1, p[1] + 1]) : S.path.map((p) => [p[0] + 1, p[1] + 1]);
+  const pts = air ? POINTS.map((p) => [p[0] + 0.5, p[1] + 0.5]) : S.path.map((p) => [p[0] + 0.5, p[1] + 0.5]);
   S.enemies.push({
     kind, air, hp: def.hp, max: def.hp, speed: def.spd, reward: def.rew, cost: def.lives,
     armor: Math.floor(n / 6) + (kind === 'boss' ? 3 : 0),
@@ -1030,186 +1047,219 @@ function render() {
   const k = cam.s * dpr;
   ctx.setTransform(k, 0, 0, k, -cam.x * k, -cam.y * k);
   ctx.imageSmoothingEnabled = false;
-  // board frame + floor
-  ctx.fillStyle = '#2a3138';
-  ctx.fillRect(-0.4, -0.4, GW + 0.8, GH + 0.8);
+  // board: a front lip under the floor gives it thickness in the 3/4 view
+  ctx.fillStyle = '#2a3138'; ctx.fillRect(-0.4, -0.4, GW + 0.8, GH + 0.8);
+  ctx.fillStyle = '#161a1e'; ctx.fillRect(-0.4, GH + 0.4, GW + 0.8, 0.7);
   ctx.drawImage(floorCv, 0, 0, GW, GH);
 
-  drawPoints(t);
+  drawPads(t);
 
   // route preview
   if (S.phase === 'build' || S.phase === 'choose' || S.phase === 'countdown') {
     const nextKind = waveInfo(S.wave).kind;
-    if (nextKind === 'air') drawRoute(POINTS.map((p) => [p[0], p[1]]), 'rgba(211,176,255,0.6)', t);
-    else if (S.path) drawRoute(S.path, 'rgba(242,169,59,0.55)', t);
-    if (S.ghost && S.ghost.ok && S.ghost.path && nextKind !== 'air') drawRoute(S.ghost.path, 'rgba(95,208,220,0.85)', t);
+    if (nextKind === 'air') drawRoute(POINTS.map((p) => [p[0], p[1]]), 'rgba(211,176,255,0.65)', t);
+    else if (S.path) drawRoute(S.path, 'rgba(242,169,59,0.6)', t);
+    if (S.ghost && S.ghost.ok && S.ghost.path && nextKind !== 'air') drawRoute(S.ghost.path, 'rgba(95,208,220,0.9)', t);
   }
 
-  // pieces
   const sel = S.sel ? pieces.get(S.sel) : null;
-  for (const p of pieces.values()) drawPiece(p, t);
+  if (sel) { ctx.fillStyle = 'rgba(255,255,255,0.16)'; ctx.fillRect(sel.x, sel.y, 2, 2); }
   if (sel && sel.kind === 'tower') {
     const st = stats(sel);
+    ctx.fillStyle = 'rgba(95,208,220,0.07)';
+    ctx.beginPath(); ctx.arc(sel.x + 1, sel.y + 1, st.rng, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = 'rgba(95,208,220,0.7)'; ctx.lineWidth = 0.08;
     ctx.setLineDash([0.3, 0.25]);
     ctx.beginPath(); ctx.arc(sel.x + 1, sel.y + 1, st.rng, 0, Math.PI * 2); ctx.stroke();
     ctx.setLineDash([]);
   }
-  if (sel) {
-    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 0.1;
-    ctx.strokeRect(sel.x - 0.05, sel.y - 0.05, 2.1, 2.1);
-  }
-  // ghost
   if (S.ghost) {
     const g = S.ghost;
-    ctx.fillStyle = g.ok ? 'rgba(95,208,220,0.25)' : 'rgba(255,90,74,0.3)';
+    ctx.fillStyle = g.ok ? 'rgba(95,208,220,0.28)' : 'rgba(255,90,74,0.32)';
     ctx.fillRect(g.x, g.y, 2, 2);
     ctx.strokeStyle = g.ok ? '#5fd0dc' : '#ff5a4a'; ctx.lineWidth = 0.1;
     ctx.strokeRect(g.x + 0.05, g.y + 0.05, 1.9, 1.9);
   }
-  // enemies
-  for (const e of S.enemies) if (e.alive && !e.air) drawEnemy(e, t);
+
+  // depth-sorted scene: things lower on the screen are nearer and drawn last
+  const list = [];
+  for (const p of pieces.values()) list.push([p.y + 2, 0, p]);
+  for (const e of S.enemies) if (e.alive && !e.air) list.push([e.y + 0.4, 1, e]);
+  list.push([REF[1] + 2.6, 2, null]);
+  list.sort((a, b) => a[0] - b[0]);
+  for (const [, kind, o] of list) {
+    if (kind === 0) drawPiece(o, t);
+    else if (kind === 1) drawEnemy(o, t);
+    else drawRefinery(t);
+  }
+  if (sel) {
+    const top = sel.kind === 'scrap' ? 0.5 : 0.85;
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 0.08;
+    ctx.strokeRect(sel.x - 0.05, sel.y - top, 2.1, 2.05 + top);
+  }
   for (const e of S.enemies) if (e.alive && e.air) drawEnemy(e, t);
-  // effects
   for (const f of S.effects) drawEffect(f);
-  // screen-space text
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   drawLabels(t);
 }
+
 function drawRoute(path, col, t) {
   ctx.save();
   ctx.strokeStyle = col; ctx.lineWidth = 0.16;
   ctx.setLineDash([0.35, 0.45]); ctx.lineDashOffset = -t * 1.6;
   ctx.lineJoin = 'round';
   ctx.beginPath();
-  path.forEach((p, i) => { const x = p[0] + 1, y = p[1] + 1; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+  path.forEach((p, i) => { const x = p[0] + 0.5, y = p[1] + 0.5; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
   ctx.stroke();
   ctx.restore();
 }
-function drawPoints(t) {
+function ellipse(x, y, rx, ry) { ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); ctx.fill(); }
+function drawPads(t) {
   // spawn portal
-  const [sx, sy] = [SPAWN[0] + 1, SPAWN[1] + 1];
+  const sx = SPAWN[0] + 0.5, sy = SPAWN[1] + 0.5;
+  ctx.fillStyle = '#24103d'; ellipse(sx, sy, 1.2, 0.85);
+  ctx.fillStyle = 'rgba(211,176,255,' + (0.3 + 0.25 * Math.sin(t * 4)) + ')'; ellipse(sx, sy, 0.75, 0.5);
   for (let i = 0; i < 3; i++) {
     const a = t * 2 + i * 2.1;
     ctx.fillStyle = ['#5b2a86', '#8d4bd1', '#d3b0ff'][i];
-    ctx.fillRect(sx + Math.cos(a) * 1.1 - 0.2, sy + Math.sin(a) * 1.1 - 0.2, 0.4, 0.4);
+    ctx.fillRect(sx + Math.cos(a) * 1 - 0.15, sy + Math.sin(a) * 0.7 - 0.15, 0.3, 0.3);
   }
-  ctx.fillStyle = '#24103d'; ctx.fillRect(sx - 0.7, sy - 0.7, 1.4, 1.4);
-  ctx.fillStyle = 'rgba(211,176,255,' + (0.35 + 0.25 * Math.sin(t * 4)) + ')';
-  ctx.fillRect(sx - 0.45, sy - 0.45, 0.9, 0.9);
-  // checkpoints
+  // checkpoints: a small pylon with a glowing cap
   CPS.forEach((c, i) => {
-    const x = c[0] + 1, y = c[1] + 1;
+    const x = c[0] + 0.5, y = c[1] + 0.5;
     const pulse = 0.5 + 0.5 * Math.sin(t * 3 + i);
-    ctx.strokeStyle = 'rgba(242,169,59,' + (0.4 + 0.4 * pulse) + ')';
-    ctx.lineWidth = 0.14;
-    ctx.strokeRect(x - 1.2 - pulse * 0.15, y - 1.2 - pulse * 0.15, 2.4 + pulse * 0.3, 2.4 + pulse * 0.3);
-    ctx.fillStyle = '#2b2214'; ctx.fillRect(x - 0.8, y - 0.8, 1.6, 1.6);
+    ctx.fillStyle = 'rgba(242,169,59,' + (0.12 + 0.18 * pulse) + ')'; ellipse(x, y + 0.2, 1.35, 0.9);
+    ctx.fillStyle = 'rgba(0,0,0,0.35)'; ellipse(x, y + 0.45, 0.55, 0.2);
+    ctx.fillStyle = '#2a2f36'; ctx.fillRect(x - 0.45, y - 0.55, 0.9, 1.0);
+    ctx.fillStyle = '#3c434c'; ctx.fillRect(x - 0.45, y - 0.75, 0.9, 0.3);
+    ctx.fillStyle = 'rgba(255,190,90,' + (0.55 + 0.45 * pulse) + ')'; ctx.fillRect(x - 0.3, y - 0.7, 0.6, 0.16);
   });
-  // refinery
-  const rx = REF[0] - 2, ry = REF[1] - 2;
-  ctx.fillStyle = '#3a3f46'; ctx.fillRect(rx + 0.3, ry + 1.2, 5.4, 4.5);
-  ctx.fillStyle = '#4e555e'; ctx.fillRect(rx + 0.3, ry + 1.2, 5.4, 0.5);
-  ctx.fillStyle = '#5c4a2a'; ctx.fillRect(rx + 0.8, ry + 2.2, 1.6, 2.8); ctx.fillRect(rx + 3.4, ry + 2.2, 1.6, 2.8);
-  ctx.fillStyle = '#c9882b'; ctx.fillRect(rx + 0.8, ry + 2.2, 1.6, 0.3); ctx.fillRect(rx + 3.4, ry + 2.2, 1.6, 0.3);
-  ctx.fillStyle = '#2a2e34'; ctx.fillRect(rx + 4.4, ry - 0.6, 0.8, 2);
+}
+function drawRefinery(t) {
+  // 5x5 pad; the building rises above it in the 3/4 view
+  const x0 = REF[0] - 2, y0 = REF[1] - 2;
+  ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(x0 + 0.2, y0 + 4.6, 4.8, 0.35);
+  // front wall
+  ctx.fillStyle = '#30363d'; ctx.fillRect(x0 + 0.2, y0 + 2.4, 4.6, 2.3);
+  ctx.fillStyle = '#262b31'; ctx.fillRect(x0 + 0.2, y0 + 4.3, 4.6, 0.4);
+  ctx.fillStyle = '#4b3d22'; ctx.fillRect(x0 + 1.9, y0 + 3.2, 1.2, 1.5);
+  ctx.fillStyle = '#c9882b';
+  for (let i = 0; i < 6; i++) ctx.fillRect(x0 + 1.9 + i * 0.2, y0 + 3.2, 0.1, 1.5);
   const glow = 0.5 + 0.5 * Math.sin(t * 2.2);
-  ctx.fillStyle = 'rgba(255,170,60,' + (0.45 + 0.4 * glow) + ')';
-  ctx.fillRect(rx + 2.6, ry + 4.2, 0.6, 0.6);
+  ctx.fillStyle = 'rgba(255,170,60,' + (0.45 + 0.45 * glow) + ')';
+  ctx.fillRect(x0 + 0.6, y0 + 2.9, 0.7, 0.35); ctx.fillRect(x0 + 3.7, y0 + 2.9, 0.7, 0.35);
+  // roof (top face)
+  ctx.fillStyle = '#48505a'; ctx.fillRect(x0 + 0.2, y0 + 0.6, 4.6, 1.8);
+  ctx.fillStyle = '#58616c'; ctx.fillRect(x0 + 0.2, y0 + 0.6, 4.6, 0.25);
+  // tanks on the roof
+  for (const tx of [0.6, 2.1]) {
+    ctx.fillStyle = '#6b5530'; ctx.fillRect(x0 + tx, y0 - 0.3, 1.2, 1.9);
+    ctx.fillStyle = '#c9882b'; ctx.fillRect(x0 + tx, y0 - 0.3, 1.2, 0.3);
+    ctx.fillStyle = '#8a6d3b'; ctx.fillRect(x0 + tx + 0.2, y0, 0.2, 1.4);
+  }
+  // chimney + smoke
+  ctx.fillStyle = '#23272c'; ctx.fillRect(x0 + 3.7, y0 - 1.6, 0.7, 3.2);
+  ctx.fillStyle = '#3a4048'; ctx.fillRect(x0 + 3.6, y0 - 1.75, 0.9, 0.3);
   for (let i = 0; i < 3; i++) {
     const life = (t * 0.45 + i / 3) % 1;
     ctx.fillStyle = 'rgba(150,155,160,' + (0.5 * (1 - life)) + ')';
-    const s = 0.35 + life * 0.5;
-    ctx.fillRect(rx + 4.8 - s / 2 + Math.sin(life * 5 + i) * 0.3, ry - 0.8 - life * 2.2, s, s);
+    const sz = 0.35 + life * 0.6;
+    ctx.fillRect(x0 + 4.05 - sz / 2 + Math.sin(life * 5 + i) * 0.3, y0 - 2 - life * 2.4, sz, sz);
   }
 }
+
 function drawPiece(p, t) {
-  if (p.kind === 'scrap') { ctx.drawImage(SPRITES.scrap[p.scrapV].c, p.x, p.y, 2, 2); return; }
-  const m = METALS[p.metal], tier = p.tier, ph = p.ph, sp = p.sp;
+  const x = p.x, y = p.y;
+  if (p.kind === 'scrap') { ctx.drawImage(SPRITES.scrap[p.scrapV].c, x, y - 0.5, 2, 2.5); return; }
+  const m = METALS[p.metal], tier = p.tier, ph = p.ph, sp = p.sp, mech = tier === 6;
+  ctx.drawImage(SPRITES.plinth.c, x, y, 2, 2);
   let spr, bob = 0;
-  if (tier === 6) {
-    const fr = Math.floor(t * 1.6 * sp + ph) % 2;
-    spr = SPRITES.piece[p.metal][5][fr];
-  } else {
+  if (mech) spr = SPRITES.piece[p.metal][5][Math.floor(t * 1.6 * sp + ph) % 2];
+  else {
     spr = SPRITES.piece[p.metal][tier - 1];
     if (tier >= 3) bob = Math.round(Math.sin(t * 2.2 * sp + ph) * 0.6) * PX;
   }
-  const x = p.x, y = p.y + bob + (p.kick ? -PX : 0);
-  // core / mech glow
+  // item stands on the plinth's top face
+  const size = mech ? 2.3 : 2, ps = size / SPR;
+  const ix = x + (2 - size) / 2, iy = y - (mech ? 0.95 : 0.75) + bob + (p.kick ? -PX : 0);
+  ctx.fillStyle = 'rgba(0,0,0,0.38)'; ellipse(x + 1, y + 1.12, mech ? 0.75 : 0.6, 0.2);
   if (tier >= 5) {
     const pulse = 0.5 + 0.5 * Math.sin(t * 3 * sp + ph);
-    const g = ctx.createRadialGradient(x + 1, y + 1, 0.1, x + 1, y + 1, tier === 6 ? 1.6 : 1.1);
+    const cx = ix + size / 2, cy = iy + size / 2;
+    const g = ctx.createRadialGradient(cx, cy, 0.1, cx, cy, mech ? 1.7 : 1.15);
     g.addColorStop(0, hexA(m.c[3], 0.25 + 0.35 * pulse));
     g.addColorStop(1, hexA(m.c[3], 0));
     ctx.fillStyle = g;
-    ctx.fillRect(x - 0.6, y - 0.6, 3.2, 3.2);
+    ctx.fillRect(cx - 1.8, cy - 1.8, 3.6, 3.6);
   }
-  ctx.drawImage(spr.c, x, y, 2, 2);
-  // glint sweep
+  ctx.drawImage(spr.c, ix, iy, size, size);
   const freq = tier >= 5 ? 18 : 26;
   const step = Math.floor(t * 14 * sp + ph * 10);
   ctx.fillStyle = 'rgba(255,255,255,0.75)';
-  for (const [px, py] of spr.mask) if (((px + py + step) % freq + freq) % freq === 0) ctx.fillRect(x + px * PX, y + py * PX, PX, PX);
+  for (const [px, py] of spr.mask) if (((px + py + step) % freq + freq) % freq === 0) ctx.fillRect(ix + px * ps, iy + py * ps, ps, ps);
   if (tier === 5) {
     const a = t * 2.4 * sp + ph;
     ctx.fillStyle = m.c[3];
-    ctx.fillRect(x + 1 + Math.cos(a) * 0.72 - PX / 2, y + 1 + Math.sin(a) * 0.72 - PX / 2, PX, PX);
+    ctx.fillRect(ix + 1 + Math.cos(a) * 0.72 - ps / 2, iy + 1 + Math.sin(a) * 0.45 - ps / 2, ps, ps);
   }
-  if (tier === 6) {
-    // eye blink
-    if (((t * sp + ph) % 3.2) < 0.13) { ctx.fillStyle = '#1b1e23'; for (const [ex, ey] of spr.eye) ctx.fillRect(x + ex * PX, y + ey * PX, PX, PX); }
-    // vent steam
+  if (mech) {
+    if (((t * sp + ph) % 3.2) < 0.13) { ctx.fillStyle = '#1b1e23'; for (const [ex, ey] of spr.eye) ctx.fillRect(ix + ex * ps, iy + ey * ps, ps, ps); }
     for (let i = 0; i < 2; i++) {
       const life = (t * 0.6 * sp + ph + i * 0.5) % 1;
       ctx.fillStyle = 'rgba(190,196,204,' + (0.55 * (1 - life)) + ')';
-      ctx.fillRect(x + (i ? 13 : 2) * PX, y + (4 - life * 5) * PX, PX, PX);
+      ctx.fillRect(ix + (i ? 13 : 2) * ps, iy + (4 - life * 5) * ps, ps, ps);
     }
-    // energy flicker
     if (Math.sin(t * 7 * sp + ph * 3) > 0.85) {
       ctx.fillStyle = m.c[3];
       const a = (t * 5 + ph) % (Math.PI * 2);
-      ctx.fillRect(x + 1 + Math.cos(a) * 1.05, y + 1 + Math.sin(a) * 1.05, PX, PX);
+      ctx.fillRect(ix + size / 2 + Math.cos(a) * 1.1, iy + size / 2 + Math.sin(a) * 0.8, ps, ps);
     }
   }
-  // tier pips
-  if (tier < 6) {
-    for (let i = 0; i < tier; i++) {
-      ctx.fillStyle = OUT; ctx.fillRect(p.x + 0.12 + i * 0.34, p.y + 1.7, 0.28, 0.24);
-      ctx.fillStyle = m.c[3]; ctx.fillRect(p.x + 0.16 + i * 0.34, p.y + 1.74, 0.2, 0.16);
+  // tier pips on the plinth's front face
+  if (!mech) {
+    const n = tier, w = n * 0.3 - 0.06, sx = x + 1 - w / 2;
+    for (let i = 0; i < n; i++) {
+      ctx.fillStyle = m.c[3]; ctx.fillRect(sx + i * 0.3, y + 1.6, 0.24, 0.13);
     }
+  } else {
+    ctx.fillStyle = m.c[3]; ctx.fillRect(x + 0.55, y + 1.6, 0.9, 0.13);
   }
-  // newly placed this round
   if (p.isNew) {
     const pulse = 0.5 + 0.5 * Math.sin(t * 5);
     ctx.strokeStyle = 'rgba(242,169,59,' + (0.45 + 0.5 * pulse) + ')';
     ctx.lineWidth = 0.09;
-    ctx.strokeRect(p.x + 0.05, p.y + 0.05, 1.9, 1.9);
+    ctx.strokeRect(x + 0.05, y - 0.8, 1.9, 2.75);
   }
 }
+
 function drawEnemy(e, t) {
   const frames = SPRITES.enemy[e.kind];
-  const fr = Math.floor((e.air ? t * 10 : e.prog * 2.2) + e.ph) % 2;
+  const fr = Math.floor((e.air ? t * 10 : e.prog * 2.6) + e.ph) % 2;
   const spr = frames[fr].c;
-  const size = e.kind === 'boss' ? 2.4 : 1.5;
-  const hover = e.air ? Math.sin(t * 4 + e.ph) * 0.12 - 0.3 : 0;
+  const size = e.kind === 'boss' ? 1.9 : (e.air ? 1.25 : 1.15);
+  const lift = e.air ? 0.95 + Math.sin(t * 4 + e.ph) * 0.12 : 0;
+  const foot = e.y + 0.38;
+  ctx.fillStyle = e.air ? 'rgba(0,0,0,0.22)' : 'rgba(0,0,0,0.38)';
+  ellipse(e.x, foot - 0.05, size * 0.38, size * 0.13);
   ctx.save();
-  ctx.translate(e.x, e.y + hover);
-  if (e.air) { ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(-0.5, 0.75 - hover, 1, 0.25); }
+  ctx.translate(e.x, foot - lift);
   if (e.dir < 0) ctx.scale(-1, 1);
-  ctx.drawImage(spr, -size / 2, -size / 2, size, size);
+  ctx.drawImage(spr, -size / 2, -size, size, size);
   ctx.restore();
-  if (e.slow > 0 || e.frozen > 0) { ctx.fillStyle = e.frozen > 0 ? 'rgba(168,198,255,0.55)' : 'rgba(63,114,230,0.35)'; ctx.fillRect(e.x - size / 2, e.y - size / 2 + hover, size, size); }
+  const top = foot - lift - size;
+  if (e.slow > 0 || e.frozen > 0) { ctx.fillStyle = e.frozen > 0 ? 'rgba(168,198,255,0.55)' : 'rgba(63,114,230,0.35)'; ctx.fillRect(e.x - size / 2, top, size, size); }
   if (e.poisT > 0) {
     ctx.fillStyle = '#5fd13a';
     const b = (t * 2 + e.ph) % 1;
-    ctx.fillRect(e.x - 0.3 + Math.sin(e.ph) * 0.3, e.y - b * 0.8, 0.14, 0.14);
+    ctx.fillRect(e.x - 0.25 + Math.sin(e.ph) * 0.25, top + size * 0.5 - b * 0.6, 0.12, 0.12);
   }
-  const w = e.kind === 'boss' ? 2.2 : 1.3, f = Math.max(0, e.hp / e.max);
-  const by = e.y - size / 2 - 0.3 + hover;
-  ctx.fillStyle = '#0a0c0f'; ctx.fillRect(e.x - w / 2 - 0.04, by - 0.04, w + 0.08, 0.22);
+  const w = e.kind === 'boss' ? 1.8 : 1.0, f = Math.max(0, e.hp / e.max);
+  const by = top - 0.22;
+  ctx.fillStyle = '#0a0c0f'; ctx.fillRect(e.x - w / 2 - 0.04, by - 0.04, w + 0.08, 0.2);
   ctx.fillStyle = f > 0.5 ? '#8bdb6b' : (f > 0.25 ? '#f2a93b' : '#ff5a4a');
-  ctx.fillRect(e.x - w / 2, by, w * f, 0.14);
+  ctx.fillRect(e.x - w / 2, by, w * f, 0.12);
 }
+
 function drawEffect(f) {
   const a = 1 - f.t / f.dur;
   switch (f.type) {
@@ -1254,10 +1304,10 @@ function drawLabels(t) {
   const fs = Math.max(10, Math.min(16, cam.s * 0.9));
   ctx.font = '700 ' + fs + 'px "Pixelify Sans", monospace';
   CPS.forEach((c, i) => {
-    const [x, y] = toScreen(c[0] + 1, c[1] + 1);
-    ctx.fillStyle = '#f2a93b'; ctx.fillText(String(i + 1), x, y + 1);
+    const [x, y] = toScreen(c[0] + 0.5, c[1] + 0.15);
+    ctx.fillStyle = '#ffd27a'; ctx.fillText(String(i + 1), x, y + 1);
   });
-  const [rx, ry] = toScreen(REF[0] + 1, REF[1] + 3.4);
+  const [rx, ry] = toScreen(REF[0] + 0.5, REF[1] + 2.95);
   ctx.font = '700 ' + Math.max(9, fs * 0.75) + 'px "Chakra Petch", sans-serif';
   ctx.fillStyle = '#e9e4d8'; ctx.fillText('REFINERY', rx, ry);
   for (const tx of S.texts) {
