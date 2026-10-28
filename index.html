@@ -124,12 +124,14 @@ button.warn { border-color: var(--red); color: var(--red); }
 'use strict';
 
 /* ================= constants ================= */
-const GW = 40, GH = 40;               // fine grid (cells); enemies walk cell to cell, 1 cell is enough
+const GW = 70, GH = 46;               // Gem TD grid; enemies walk cell to cell, 1 cell is enough
 const NW = GW, NH = GH;
-// Crossing layout: the 1->2 and 3->4 legs both cut through the middle, so air waves pass the centre twice.
-const SPAWN = [3, 3];
-const CPS = [[3, 20], [36, 20], [20, 3], [20, 36], [36, 3]];
-const REF = [36, 36];
+// Gem TD layout. Each checkpoint is a 2x2 block (top-left cell given) with no-build arms (U/D/L/R)
+// toward the lanes. The 5->6 leg crosses the 2->3 leg, so air waves pass that crossing twice.
+const SPAWN = [0, 2];
+const CPS = [[24, 2], [24, 26], [56, 26], [56, 2], [40, 2], [40, 42]];
+const CP_ARMS = ['LRD', 'UDR', 'LRU', 'UDL', 'LRD', 'UDR'];
+const REF = [66, 42];
 const POINTS = [SPAWN, ...CPS, REF];
 const SPR = 16;                       // sprite pixels per 2x2 building
 const PX = 2 / SPR;                   // one sprite pixel in cells
@@ -177,8 +179,18 @@ function newGame() {
   reserved = new Uint8Array(GW * GH);
   pieces = new Map();
   nextId = 1;
-  for (const p of [SPAWN, ...CPS]) reserveArea(p[0], p[1], 1);
-  reserveArea(REF[0], REF[1], 2);
+  reserveRect(SPAWN[0], SPAWN[1], 2, 2);
+  CPS.forEach((c, i) => {
+    const [x, y] = c;
+    reserveRect(x, y, 2, 2);
+    for (const a of CP_ARMS[i]) {
+      if (a === 'U') reserveRect(x, y - 2, 2, 2);
+      if (a === 'D') reserveRect(x, y + 2, 2, 2);
+      if (a === 'L') reserveRect(x - 2, y, 2, 2);
+      if (a === 'R') reserveRect(x + 2, y, 2, 2);
+    }
+  });
+  reserveRect(REF[0] - 2, REF[1] - 2, 6, 6);
   S = {
     wave: 1, lives: 20, gold: 10, odds: 0,
     phase: 'build', placed: 0, newIds: [],
@@ -191,9 +203,9 @@ function newGame() {
 }
 
 const I = (x, y) => y * GW + x;
-function reserveArea(nx, ny, r) {
-  for (let y = ny - r; y <= ny + r; y++)
-    for (let x = nx - r; x <= nx + r; x++)
+function reserveRect(x0, y0, w, h) {
+  for (let y = y0; y < y0 + h; y++)
+    for (let x = x0; x < x0 + w; x++)
       if (x >= 0 && y >= 0 && x < GW && y < GH) reserved[I(x, y)] = 1;
 }
 
@@ -601,18 +613,19 @@ function buildFloor() {
     g.fillStyle = rnd() < 0.5 ? 'rgba(0,0,0,0.18)' : 'rgba(255,255,255,0.03)';
     g.fillRect((rnd() * GW * sc) | 0, (rnd() * GH * sc) | 0, 1 + (rnd() * 2 | 0), 1);
   }
-  // hazard pads around reserved areas
-  const pad = (nx, ny, r, col) => {
-    const x0 = (nx - r) * sc, y0 = (ny - r) * sc, w = (2 * r + 1) * sc;
-    g.fillStyle = '#121518'; g.fillRect(x0, y0, w, w);
-    for (let i = 0; i < w; i++) for (let j = 0; j < w; j++) {
-      const edge = i < 3 || j < 3 || i >= w - 3 || j >= w - 3;
-      if (edge && ((i + j) >> 2) % 2 === 0) { g.fillStyle = col; g.fillRect(x0 + i, y0 + j, 1, 1); }
+  // no-build zones: dark plate with hazard stripes along their outer edges
+  for (let cy = 0; cy < GH; cy++) for (let cx = 0; cx < GW; cx++) {
+    if (!reserved[I(cx, cy)]) continue;
+    const spawn = cx < 2 && cy >= SPAWN[1] && cy < SPAWN[1] + 2;
+    const col = spawn ? '#7c4dd1' : '#c9882b';
+    const x0 = cx * sc, y0 = cy * sc;
+    g.fillStyle = '#121518'; g.fillRect(x0, y0, sc, sc);
+    const open = (dx, dy) => { const x = cx + dx, y = cy + dy; return x >= 0 && y >= 0 && x < GW && y < GH && !reserved[I(x, y)]; };
+    for (let i = 0; i < sc; i++) for (let j = 0; j < sc; j++) {
+      const edge = (open(0, -1) && j < 2) || (open(0, 1) && j >= sc - 2) || (open(-1, 0) && i < 2) || (open(1, 0) && i >= sc - 2);
+      if (edge && (((x0 + i) + (y0 + j)) >> 2) % 2 === 0) { g.fillStyle = col; g.fillRect(x0 + i, y0 + j, 1, 1); }
     }
-  };
-  pad(SPAWN[0], SPAWN[1], 1, '#7c4dd1');
-  for (const c of CPS) pad(c[0], c[1], 1, '#c9882b');
-  pad(REF[0], REF[1], 2, '#c9882b');
+  }
 }
 
 /* ================= camera & canvas ================= */
@@ -1116,7 +1129,7 @@ function drawRoute(path, col, t) {
 function ellipse(x, y, rx, ry) { ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); ctx.fill(); }
 function drawPads(t) {
   // spawn portal
-  const sx = SPAWN[0] + 0.5, sy = SPAWN[1] + 0.5;
+  const sx = SPAWN[0] + 1, sy = SPAWN[1] + 1;
   ctx.fillStyle = '#24103d'; ellipse(sx, sy, 1.2, 0.85);
   ctx.fillStyle = 'rgba(211,176,255,' + (0.3 + 0.25 * Math.sin(t * 4)) + ')'; ellipse(sx, sy, 0.75, 0.5);
   for (let i = 0; i < 3; i++) {
@@ -1126,7 +1139,7 @@ function drawPads(t) {
   }
   // checkpoints: a small pylon with a glowing cap
   CPS.forEach((c, i) => {
-    const x = c[0] + 0.5, y = c[1] + 0.5;
+    const x = c[0] + 1, y = c[1] + 1;
     const pulse = 0.5 + 0.5 * Math.sin(t * 3 + i);
     ctx.fillStyle = 'rgba(242,169,59,' + (0.12 + 0.18 * pulse) + ')'; ellipse(x, y + 0.2, 1.35, 0.9);
     ctx.fillStyle = 'rgba(0,0,0,0.35)'; ellipse(x, y + 0.45, 0.55, 0.2);
@@ -1304,7 +1317,7 @@ function drawLabels(t) {
   const fs = Math.max(10, Math.min(16, cam.s * 0.9));
   ctx.font = '700 ' + fs + 'px "Pixelify Sans", monospace';
   CPS.forEach((c, i) => {
-    const [x, y] = toScreen(c[0] + 0.5, c[1] + 0.15);
+    const [x, y] = toScreen(c[0] + 1, c[1] + 0.65);
     ctx.fillStyle = '#ffd27a'; ctx.fillText(String(i + 1), x, y + 1);
   });
   const [rx, ry] = toScreen(REF[0] + 0.5, REF[1] + 2.95);
@@ -1470,8 +1483,8 @@ function frame(now) {
 }
 
 buildSprites();
-buildFloor();
 newGame();
+buildFloor();
 resize();
 window.addEventListener('resize', resize);
 new ResizeObserver(resize).observe(app);
