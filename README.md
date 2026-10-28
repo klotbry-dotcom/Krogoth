@@ -12,6 +12,10 @@ The whole game is one file: `index.html` (HTML, CSS and JavaScript, no libraries
 - The 5→6 leg crosses the 2→3 leg, so **air waves** (which fly straight from checkpoint to checkpoint) pass that crossing twice.
 - **Combining:** two identical pieces (same metal, same tier) merge into the next tier. At least one of the pair has to be from the current round. The other piece becomes scrap.
 - **Odds:** spend gold to raise the chance that new pieces start at a higher tier.
+- **Scrap:** tap scrap to **Dispose** of it (free, any time; enemies already walking re-route). While placing your 5, tap scrap and choose **Use as piece n of 5** to turn it into one of them.
+- **Kills:** every tower records its kills and gains +1% damage per 5 kills. Combining keeps both towers' kills.
+- **Speed:** 1×, 2×, 3×, 5×.
+- **Difficulty:** from wave 6 enemies get 4% faster each wave (up to about double speed).
 
 ## Metals
 
@@ -33,6 +37,12 @@ Flavour names: Gold Nugget, Copper Wire and Coil, Gold Wire, Uranium Fuel Rod an
 
 Mechs: Iron Juggernaut, Copper Stormcaller, Cobalt Frostwalker, Uranium Meltdown, Tungsten Railbreaker, Gold Midas, Titanium Skyhawk.
 
+## Combat feel
+
+- Towers turn to aim at their target (and idly scan when nothing is in range), with recoil and muzzle flashes.
+- Projectiles: Iron shells arc and explode, Cobalt fires ice shards, Uranium lobs radiation globs, Gold flings coins, Titanium fires tracers (Skyhawk fires homing missiles). Copper chains lightning and Tungsten fires beams instantly.
+- Enemies are machines: Scuttler (ground), Runner (fast), Hornet drone (air) and Warlord (boss). They flash white when hit and break into debris and smoke when destroyed.
+
 ## Grid
 
 - 70 × 46 cells (Gem TD's grid). Towers and scrap take 2 × 2 cells and can be placed on any cell.
@@ -42,4 +52,4 @@ Mechs: Iron Juggernaut, Copper Stormcaller, Cobalt Frostwalker, Uranium Meltdown
 
 ## Not built yet
 
-Recipes and special mechs, removing scrap for gold, saving a run, sound, more enemy types.
+Recipes and special mechs, saving a run, sound, more enemy types.
