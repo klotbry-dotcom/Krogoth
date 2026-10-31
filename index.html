@@ -194,7 +194,7 @@ button.warn { border-color: var(--red); color: var(--red); }
 <div id="app">
   <canvas id="cv" aria-label="Krogoth game field"></canvas>
   <header id="hud">
-    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.19.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
+    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.20.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
     <div class="stat"><span class="lbl">Wave</span><b id="hWave">1</b></div>
     <div class="stat lives"><span class="lbl">Lives</span><b id="hLives">20</b></div>
     <div class="stat gold"><span class="lbl">Gold</span><b id="hGold">10</b></div>
@@ -220,6 +220,13 @@ const CPS = [[24, 4], [24, 28], [56, 28], [56, 4], [40, 4], [40, 46]];
 const CP_ARMS = ['LRD', 'UDR', 'LRU', 'UDL', 'LRD', 'UDR'];
 const REF = [66, 46];
 const POINTS = [SPAWN, ...CPS, REF];
+// The checkpoint pads occupy 2x2 cells; path nodes must pass through their true centres.
+// Ordinary path cells use their own centres. Refinery stays on its original endpoint.
+function pathPoint(p) {
+  if (p[0] === SPAWN[0] && p[1] === SPAWN[1]) return [p[0] + 1, p[1] + 1];
+  for (const c of CPS) if (p[0] === c[0] && p[1] === c[1]) return [p[0] + 1, p[1] + 1];
+  return [p[0] + 0.5, p[1] + 0.5];
+}
 const SPR = 16;                       // sprite pixels per 2x2 building
 const PX = 2 / SPR;                   // one sprite pixel in cells
 
@@ -248,16 +255,20 @@ function tierLabel(mi, t) {
 }
 function pieceName(mi, t) { return METALS[mi].name + ' ' + tierLabel(mi, t); }
 
-// Starting-tier probabilities: six tiers, including 5-star Cores and 6-star Mechs.
-// Each row sums to 100; higher Metal Chance levels unlock rare top-tier rolls.
+// Metal Chance has 11 levels (0–10), with at most 20% five-star Core drops.
+// Six-star Mechs remain exclusive to combining five-star towers.
 const ODDS = [
-  [100,0,0,0,0,0], [75,25,0,0,0,0], [60,30,10,0,0,0],
-  [50,30,20,0,0,0], [40,30,22,8,0,0], [30,32,26,12,0,0],
-  [20,32,30,18,0,0], [12,30,33,25,0,0], [5,25,35,35,0,0],
-  [5,20,32,38,5,0], [4,16,29,40,11,0], [3,13,25,42,16,1],
-  [2,10,21,42,22,3], [1,8,18,40,28,5], [1,6,14,37,34,8],
-  [0,4,11,32,41,12], [0,3,8,27,45,17], [0,2,6,22,48,22],
-  [0,1,4,18,50,27], [0,0,3,15,50,32],
+  [100,0,0,0,0],
+  [75,25,0,0,0],
+  [60,30,10,0,0],
+  [50,30,20,0,0],
+  [40,30,22,8,0],
+  [30,32,26,12,0],
+  [20,32,30,18,0],
+  [12,30,33,25,0],
+  [8,25,31,30,6],
+  [5,20,30,33,12],
+  [4,16,25,35,20]
 ];
 const oddsCost = (l) => Math.round(12 * Math.pow(l + 1, 1.35));
 
@@ -381,7 +392,7 @@ function rerouteGround() {
     if (!r) continue;
     e.nodes = [e.nodes[e.i]].concat(r.nodes);
     e.legs = [e.legs[e.i]].concat(r.legs);
-    e.pts = e.nodes.map((n) => [n[0] + 0.5, n[1] + 0.5]);
+    e.pts = e.nodes.map(pathPoint);
     e.pts[0] = [e.x, e.y];
     e.i = 0;
   }
@@ -1265,7 +1276,7 @@ function spawnEnemy(kind) {
   }[kind];
   const nodes = air ? POINTS.slice() : S.path.slice();
   const legs = air ? POINTS.map((_, i) => i) : S.legs.slice();
-  const pts = nodes.map((p) => [p[0] + 0.5, p[1] + 0.5]);
+  const pts = nodes.map(pathPoint);
   S.enemies.push({
     kind, air, hp: def.hp, max: def.hp, speed: def.spd * speedMult(n), reward: def.rew, cost: def.lives,
     armor: Math.floor(n / 6) + (kind === 'boss' ? 3 : 0),
@@ -1771,7 +1782,7 @@ function drawRoute(path, col, t) {
   ctx.setLineDash([0.18, 0.55]); ctx.lineDashOffset = -t * 0.7;
   ctx.lineJoin = 'round';
   ctx.beginPath();
-  path.forEach((p, i) => { const x = p[0] + 0.5, y = p[1] + 0.5; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+  path.forEach((p, i) => { const [x,y] = pathPoint(p); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
   ctx.stroke();
   ctx.restore();
 }
@@ -2072,7 +2083,7 @@ function drawEnemy(e, t) {
   const size = e.kind === 'boss' ? 2.2 : (e.air ? 1.35 : (e.kind === 'fast' ? 1.25 : 1.3));
   const gaitPhase = t * (e.kind === 'fast' ? 17 : e.kind === 'boss' ? 5.2 : 9) + e.ph;
   const lift = e.air ? 0.95 + Math.sin(t * 4 + e.ph) * 0.12 : (e.frozen > 0 ? 0 : Math.abs(Math.sin(gaitPhase)) * (e.kind === 'fast' ? 0.085 : e.kind === 'boss' ? 0.028 : 0.045));
-  const foot = e.y + 0.4;
+  const foot = e.y;
   const top = foot - lift - size;
   ctx.fillStyle = e.air ? 'rgba(0,0,0,0.22)' : 'rgba(0,0,0,0.4)';
   ellipse(e.x, foot - 0.06, size * 0.36, size * 0.12);
@@ -2147,6 +2158,51 @@ function drawEnemy(e, t) {
       ctx.fillRect(e.x+side*0.35-0.055,foot-lift+0.1,0.11,thrust);
     }
   }
+  // Enemy identity pass: strong recognisable silhouettes, animated mechanical accents.
+  // All details anchor to the actual route coordinate, not a shifted sprite position.
+  ctx.save();
+  if(e.kind==='ground'){
+    const step=e.frozen>0?0:Math.sin(gaitPhase);
+    ctx.fillStyle='#293b37';
+    ctx.fillRect(e.x-0.42,top+0.33,0.19,0.39);
+    ctx.fillRect(e.x+0.23,top+0.33,0.19,0.39);
+    ctx.fillStyle='#b6ef7c';
+    ctx.fillRect(e.x-0.36,top+0.4,0.1,0.07);
+    ctx.fillRect(e.x+0.26,top+0.4,0.1,0.07);
+    ctx.fillStyle='#83d653';
+    ctx.fillRect(e.x-0.22+step*0.035,top+0.66,0.44,0.09);
+  }else if(e.kind==='fast'){
+    const streak=0.5+0.5*Math.sin(gaitPhase);
+    ctx.fillStyle='#303e4a';
+    ctx.beginPath();ctx.moveTo(e.x-0.5,top+0.5);ctx.lineTo(e.x-0.76,top+0.68);
+    ctx.lineTo(e.x-0.42,top+0.62);ctx.closePath();ctx.fill();
+    ctx.beginPath();ctx.moveTo(e.x+0.5,top+0.5);ctx.lineTo(e.x+0.76,top+0.68);
+    ctx.lineTo(e.x+0.42,top+0.62);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#ffc063';
+    ctx.fillRect(e.x-0.24,top+0.34,0.48,0.09);
+    ctx.fillStyle='rgba(255,206,111,'+(0.5+0.5*streak)+')';
+    ctx.fillRect(e.x-0.09,top+0.26,0.18,0.07);
+  }else if(e.kind==='air'){
+    const sweep=Math.sin(t*10+e.ph)*0.12;
+    ctx.fillStyle='#344d67';
+    ctx.fillRect(e.x-0.72,top+0.42+sweep,0.31,0.16);
+    ctx.fillRect(e.x+0.41,top+0.42-sweep,0.31,0.16);
+    ctx.fillStyle='#a9eaff';
+    ctx.fillRect(e.x-0.65,top+0.47+sweep,0.12,0.05);
+    ctx.fillRect(e.x+0.53,top+0.47-sweep,0.12,0.05);
+  }else if(e.kind==='boss'){
+    const pulse=0.5+0.5*Math.sin(t*3+e.ph);
+    ctx.fillStyle='#21272f';
+    ctx.fillRect(e.x-0.85,top+0.54,0.24,0.75);
+    ctx.fillRect(e.x+0.61,top+0.54,0.24,0.75);
+    ctx.fillStyle='#a13e31';
+    ctx.fillRect(e.x-0.8,top+0.62,0.13,0.38);
+    ctx.fillRect(e.x+0.67,top+0.62,0.13,0.38);
+    ctx.fillStyle='rgba(255,110,63,'+(0.5+0.5*pulse)+')';
+    ctx.fillRect(e.x-0.36,top+0.35,0.72,0.12);
+    ctx.fillRect(e.x-0.16,top+0.22,0.32,0.1);
+  }
+  ctx.restore();
   // hostile light glow
   const lg = 0.3 + 0.25 * Math.sin(t * 6 + e.ph);
   ctx.fillStyle = hexA(ELIGHT[e.kind], lg * 0.5); ellipse(e.x + (e.dir < 0 ? -1 : 1) * size * 0.25, top + size * 0.45, size * 0.18, size * 0.12);
@@ -2237,7 +2293,7 @@ function drawLabels(t) {
     ctx.fillStyle = '#ffd27a'; ctx.fillText(String(i + 1), x, y + 1);
   });
   const [rx, ry] = toScreen(REF[0] + 0.5, REF[1] + 2.95);
-  ctx.font = '700 ' + Math.max(9, fs * 0.75) + 'px "Chakra Petch", sans-serif';
+  ctx.font = '700 ' + Math.max(9, fs * 0.75) + 'px "Inter", Arial, sans-serif';
   ctx.fillStyle = '#e9e4d8'; ctx.fillText('REFINERY', rx, ry);
   for (const tx of S.texts) {
     const a = 1 - tx.t / tx.dur;
@@ -2300,7 +2356,7 @@ function oddsTable() {
   const cur = ODDS[S.odds], nxt = ODDS[Math.min(S.odds + 1, ODDS.length - 1)];
   const max = S.odds >= ODDS.length - 1;
   let h = '<table class="odds"><thead><tr><th>Starts as</th><th>Now (level ' + S.odds + ')</th>' + (max ? '' : '<th>Next level</th>') + '</tr></thead><tbody>';
-  ['1★ Ore', '2★ Ingot', '3★ Rod / Wire', '4★ Bolt / Coil', '5★ Core', '6★ Mech'].forEach((nm, i) => {
+  ['1★ Ore', '2★ Ingot', '3★ Rod / Wire', '4★ Bolt / Coil', '5★ Core'].forEach((nm, i) => {
     h += '<tr><td>' + nm + '</td><td>' + cur[i] + '%</td>' + (max ? '' : '<td class="' + (nxt[i] > cur[i] ? 'up' : '') + '">' + nxt[i] + '%</td>') + '</tr>';
   });
   return h + '</tbody></table>';
@@ -2310,7 +2366,7 @@ function renderPanel() {
   const sel = S.sel ? pieces.get(S.sel) : null;
   if (S.showOdds) {
     const max = S.odds >= ODDS.length - 1, cost = oddsCost(S.odds);
-    h += '<div class="hint">Higher Metal Chance unlocks 5★ Core drops at level 9 and rare 6★ Mechs at level 11. Upgrade to improve their chances.</div>' + oddsTable();
+    h += '<div class="hint">Metal Chance upgrades reach a maximum 20% chance of a 5★ Core at level 10. Combine matching 5★ Cores to create 6★ Mechs.</div>' + oddsTable();
     h += '<div class="row">' + (max ? '<button type="button" disabled>Metal Chance at maximum</button>' :
       '<button type="button" class="primary" data-act="buy"' + (S.gold < cost ? ' disabled' : '') + '>Upgrade for ' + cost + ' gold</button>') +
       '<button type="button" data-act="closeOdds">Close</button></div>';
@@ -2457,6 +2513,6 @@ async function krogothCheckUpdate(){
 }
 document.getElementById('versionTag').addEventListener('click',krogothCheckUpdate);
 if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=19',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
+  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=20',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
 }
 </script>
