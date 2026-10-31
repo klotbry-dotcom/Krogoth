@@ -526,6 +526,43 @@ function sprMech(mi, f) {
     case 'gold': P.set(6, 1 + b, M[3]); P.set(9, 1 + b, M[3]); P.set(7, 1 + b, M[2]); P.set(8, 1 + b, M[2]); break;
     case 'titanium': for (let x = 0; x <= 2; x++) { P.set(x, 5 + b, '#ffffff'); P.set(x + 13, 5 + b, '#ffffff'); } break;
   }
+  // Distinctive industrial silhouettes and high-contrast pixel detailing for each metal.
+  const steel = '#171c23', trim = '#87939f', glint = '#d9e4e9';
+  // Reinforced shoulders, articulated knees and chest plating.
+  for (const x of [3, 12]) { P.set(x, 5 + b, trim); P.set(x, 6 + b, M[0]); P.set(x, 9 + b, steel); }
+  for (const x of [5, 10]) { P.set(x, 11, trim); P.set(x, 12, steel); }
+  P.set(5, 7 + b, M[3]); P.set(10, 7 + b, M[1]);
+  P.set(6, 9 + b, steel); P.set(9, 9 + b, steel);
+  switch (m.k) {
+    case 'iron': // Twin blast-furnace exhausts and heavy cannon shoulders.
+      for (const x of [1, 13]) { P.set(x, 2 + b, trim); P.set(x, 3 + b, steel); P.set(x + 1, 4 + b, M[1]); }
+      P.set(4, 7 + b, '#ff9c46'); P.set(11, 7 + b, '#ff9c46');
+      P.set(7, 9 + b, '#ffbd55'); break;
+    case 'copper': // Tesla antennae and paired electrical capacitors.
+      for (const x of [2, 13]) { P.set(x, b, glint); P.set(x, 1 + b, M[3]); P.set(x, 4 + b, steel); }
+      for (const x of [1, 14]) { P.set(x, 6 + b, '#8ceeff'); P.set(x, 8 + b, M[3]); }
+      P.set(7, 9 + b, '#9ef9ff'); break;
+    case 'cobalt': // Cryogenic radiator fins and frosted emitter.
+      for (const x of [0, 15]) for (const y of [4, 6, 8]) P.set(x, y + b, '#b8f3ff');
+      P.set(7, 6 + b, '#d7faff'); P.set(8, 6 + b, '#78d6ff');
+      P.set(7, 9 + b, '#c9f8ff'); break;
+    case 'uranium': // Shielded reactor and hazard-green conduits.
+      for (const x of [1, 14]) { P.set(x, 5 + b, '#b2ff53'); P.set(x, 9 + b, '#83d82b'); }
+      P.set(6, 7 + b, steel); P.set(9, 7 + b, steel);
+      P.set(7, 9 + b, '#c5ff5b'); P.set(8, 9 + b, '#a4ef30'); break;
+    case 'tungsten': // Long penetrator railgun and targeting optic.
+      for (let y = 0; y <= 5; y++) { P.set(14, y + b, steel); P.set(15, y + b, trim); }
+      P.set(15, b, '#ff4c45'); P.set(4, 6 + b, '#e74a40');
+      P.set(7, 9 + b, '#ff6159'); break;
+    case 'gold': // Crown fins and a gilded energy regulator.
+      P.set(5, 2 + b, M[3]); P.set(10, 2 + b, M[3]);
+      P.set(6, b, glint); P.set(9, b, glint);
+      P.set(7, 9 + b, '#fff3a0'); P.set(8, 9 + b, '#fff3a0'); break;
+    case 'titanium': // Anti-air winglets and twin tracking lights.
+      for (const x of [0, 15]) { P.set(x, 4 + b, glint); P.set(x, 7 + b, '#8eeaff'); }
+      P.set(2, 3 + b, trim); P.set(13, 3 + b, trim);
+      P.set(7, 9 + b, '#8eeaff'); break;
+  }
   const out = P.done();
   out.eye = [[7, 3 + b], [8, 3 + b]];
   return out;
