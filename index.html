@@ -6,7 +6,7 @@
 <link rel="icon" type="image/svg+xml" href="./icon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Pixelify+Sans:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
 <style>
 /* Layout: full-screen scrollable refinery floor (canvas) with a slim gauge strip on top and a work-order panel at the bottom. */
 :root {
@@ -23,8 +23,8 @@
   --red: #ff5a4a;
   --cyan: #5fd0dc;
   --good: #8bdb6b;
-  --font-display: "Pixelify Sans", "Courier New", monospace;
-  --font-ui: "Chakra Petch", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Inter", "Arial", system-ui, sans-serif;
+  --font-ui: "Inter", "Arial", system-ui, sans-serif;
 }
 html, body { height: 100%; }
 body {
@@ -194,7 +194,7 @@ button.warn { border-color: var(--red); color: var(--red); }
 <div id="app">
   <canvas id="cv" aria-label="Krogoth game field"></canvas>
   <header id="hud">
-    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.17.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
+    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.18.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
     <div class="stat"><span class="lbl">Wave</span><b id="hWave">1</b></div>
     <div class="stat lives"><span class="lbl">Lives</span><b id="hLives">20</b></div>
     <div class="stat gold"><span class="lbl">Gold</span><b id="hGold">10</b></div>
@@ -2427,6 +2427,6 @@ async function krogothCheckUpdate(){
 }
 document.getElementById('versionTag').addEventListener('click',krogothCheckUpdate);
 if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=17',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
+  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=18',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
 }
 </script>
