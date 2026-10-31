@@ -194,7 +194,7 @@ button.warn { border-color: var(--red); color: var(--red); }
 <div id="app">
   <canvas id="cv" aria-label="Krogoth game field"></canvas>
   <header id="hud">
-    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.15.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
+    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.16.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
     <div class="stat"><span class="lbl">Wave</span><b id="hWave">1</b></div>
     <div class="stat lives"><span class="lbl">Lives</span><b id="hLives">20</b></div>
     <div class="stat gold"><span class="lbl">Gold</span><b id="hGold">10</b></div>
@@ -202,7 +202,7 @@ button.warn { border-color: var(--red); color: var(--red); }
     <button id="bSpeed" class="chip" type="button">1×</button>
   </header>
   <div id="next"></div>
-  <button id="bOdds" class="odds-fab" type="button" aria-label="Upgrade tower odds" title="Upgrade tower odds"><span class="odds-icon" aria-hidden="true">✦</span><span id="oddsText">ODDS 0</span></button>
+  <button id="bOdds" class="odds-fab" type="button" aria-label="Metal Chance" title="Metal Chance"><span class="odds-icon" aria-hidden="true">✦</span><span id="oddsText">METAL CHANCE 0</span></button>
   <section id="panel" aria-live="polite"></section>
 </div>
 
@@ -1598,9 +1598,23 @@ function render() {
   const sel = S.sel ? pieces.get(S.sel) : null;
   for (const p of pieces.values()) {
     if (!p.isNew) continue;
-    const pulse = 0.5 + 0.5 * Math.sin(t * 5);
-    ctx.fillStyle = 'rgba(242,169,59,' + (0.1 + 0.12 * pulse) + ')'; ctx.fillRect(p.x, p.y, 2, 2);
-    corners(p.x + 0.05, p.y + 0.05, 1.9, 1.9, 0.45, 'rgba(242,169,59,' + (0.6 + 0.4 * pulse) + ')', 0.1);
+    // Temporary five-piece selection: moving amber scanner underneath each new tower.
+    const pulse = 0.5 + 0.5 * Math.sin(t * 4.5 + p.id * 0.35);
+    const cx = p.x + 1, cy = p.y + 1;
+    ctx.fillStyle = 'rgba(255,174,49,' + (0.13 + 0.15 * pulse) + ')';
+    ctx.fillRect(p.x + 0.08, p.y + 0.08, 1.84, 1.84);
+    ctx.strokeStyle = 'rgba(255,201,91,' + (0.38 + 0.48 * pulse) + ')';
+    ctx.lineWidth = 0.075;
+    ctx.strokeRect(p.x + 0.1, p.y + 0.1, 1.8, 1.8);
+    corners(p.x - 0.07, p.y - 0.07, 2.14, 2.14, 0.48, '#ffce69', 0.115);
+    // A scanning line travels across the temporary placement pad.
+    const scan = (t * 0.95 + p.id * 0.19) % 1;
+    ctx.fillStyle = 'rgba(255,223,143,' + (0.25 + 0.28 * pulse) + ')';
+    ctx.fillRect(p.x + 0.17, p.y + 0.22 + scan * 1.5, 1.66, 0.07);
+    // Small floor LEDs on either side of the plinth.
+    ctx.fillStyle = pulse > 0.5 ? '#ffe4a0' : '#9a632c';
+    ctx.fillRect(p.x + 0.14, p.y + 1.74, 0.16, 0.13);
+    ctx.fillRect(p.x + 1.70, p.y + 1.74, 0.16, 0.13);
   }
   if (sel && sel.kind === 'tower') {
     const st = stats(sel);
@@ -2244,8 +2258,8 @@ function renderPanel() {
   const sel = S.sel ? pieces.get(S.sel) : null;
   if (S.showOdds) {
     const max = S.odds >= ODDS.length - 1, cost = oddsCost(S.odds);
-    h += '<div class="hint">Better odds make new pieces start at a higher tier.</div>' + oddsTable();
-    h += '<div class="row">' + (max ? '<button type="button" disabled>Odds at maximum</button>' :
+    h += '<div class="hint">Higher Metal Chance gives newly placed metals a better chance to start at a higher tier.</div>' + oddsTable();
+    h += '<div class="row">' + (max ? '<button type="button" disabled>Metal Chance at maximum</button>' :
       '<button type="button" class="primary" data-act="buy"' + (S.gold < cost ? ' disabled' : '') + '>Upgrade for ' + cost + ' gold</button>') +
       '<button type="button" data-act="closeOdds">Close</button></div>';
   } else if (S.phase === 'over') {
@@ -2325,7 +2339,7 @@ function updHud() {
     $('hWave').textContent = S.wave;
     $('hLives').textContent = S.lives;
     $('hGold').textContent = S.gold;
-    $('oddsText').textContent = 'ODDS ' + S.odds;
+    $('oddsText').textContent = 'METAL CHANCE ' + S.odds;
     $('bSpeed').textContent = S.speed + '×';
     const lbl = nk.kind === 'boss' ? 'Boss + escorts' : KIND_LABEL[nk.kind] + ' ×' + nk.count;
     nextEl.innerHTML = (S.phase === 'wave' ? 'Now: ' : 'Next: ') + '<b>' + lbl + '</b>';
@@ -2334,7 +2348,7 @@ function updHud() {
   const oddsButton=$('bOdds');
   const canUpgrade=!S.over && S.odds<ODDS.length-1 && S.gold>=oddsCost(S.odds);
   oddsButton.classList.toggle('can-upgrade',canUpgrade);
-  oddsButton.setAttribute('aria-label',canUpgrade?'Odds upgrade available — tap to open upgrade panel':'View odds and upgrades');
+  oddsButton.setAttribute('aria-label',canUpgrade?'Metal Chance upgrade available — tap to open':'View Metal Chance and upgrades');
   const lc = document.getElementById('leftCount');
   if (lc) lc.textContent = (S.spawnQ.length + S.enemies.filter((e) => e.alive).length) + ' left.';
 }
@@ -2371,7 +2385,7 @@ window.__krogoth = {
 
 <script>
 /* Keep installed and browser versions in sync; the badge can force a fresh check. */
-const KROGOTH_VERSION='0.15.0';
+const KROGOTH_VERSION='0.16.0';
 async function krogothCheckUpdate(){
   const tag=document.getElementById('versionTag');
   if(tag){tag.querySelector('.ver-number').textContent='Checking…';tag.disabled=true;}
@@ -2391,6 +2405,6 @@ async function krogothCheckUpdate(){
 }
 document.getElementById('versionTag').addEventListener('click',krogothCheckUpdate);
 if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=15',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
+  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=16',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
 }
 </script>
