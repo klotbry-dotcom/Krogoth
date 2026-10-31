@@ -596,34 +596,39 @@ function sprMech(mi, f) {
   return out;
 }
 function sprScrap(v) {
-  // Wide, ground-hugging salvage heap occupying almost the full 2x2 maze obstacle.
-  // Top-down scattered plates: broad footprint, no vertical tower silhouette.
-  const P = painter(SPR, 20);
-  const D='#181c21', S='#23292f', M='#30363d', H='#414850', L='#535a61';
-  const put=(x,y,c)=>P.set(x,y,c);
-  const fill=(x,y,w,h,c)=>{for(let yy=y;yy<y+h;yy++)for(let xx=x;xx<x+w;xx++)put(xx,yy,c);};
-  // Organic irregular outline extending to all four edges and nearly all rows.
-  const left=[4,2,1,1,0,0,1,0,0,0,1,0,1,1,2,3,4];
-  const right=[11,13,14,14,15,15,14,15,15,15,14,15,14,14,13,12,11];
-  for(let y=0;y<17;y++)for(let x=left[y];x<=right[y];x++){
-    const n=(x*17+y*11+v*29)%23;
-    const edge=x===left[y]||x===right[y]||y===0||y===16;
-    put(x,y,edge?D:n<5?D:n<13?S:M);
+  // Low empty industrial platform: raised top surface, thin front/side walls.
+  // 16x20 sprite is drawn slightly above its 2x2 blocking footprint.
+  const P = painter(SPR,20);
+  const edge='#1b2026', wall='#252c34', face='#333b44';
+  const top='#404a54', panel='#49535d', rim='#606b76', bolt='#78818a';
+  const fill=(x,y,w,h,c)=>{for(let yy=y;yy<y+h;yy++)for(let xx=x;xx<x+w;xx++)P.set(xx,yy,c);};
+  // Raised bevelled slab, near full width with slightly clipped corners.
+  fill(2,3,12,1,rim);
+  fill(1,4,14,1,rim);
+  fill(0,5,16,8,top);
+  fill(1,5,14,7,top);
+  fill(0,12,16,1,face);
+  fill(1,13,14,3,wall);
+  fill(2,16,12,1,edge);
+  fill(0,5,1,8,edge);fill(15,5,1,8,edge);
+  fill(1,6,1,5,panel);fill(14,6,1,5,face);
+  fill(2,5,12,1,panel);
+  // Large empty, slightly varied metal top with restrained seams.
+  if(v===0){
+    fill(3,8,10,1,face);fill(7,6,1,6,face);
+    fill(3,7,3,1,panel);fill(10,10,3,1,panel);
+  }else if(v===1){
+    fill(2,9,12,1,face);fill(5,6,1,3,face);fill(10,10,1,2,face);
+    fill(3,6,4,1,panel);fill(9,11,4,1,panel);
+  }else{
+    fill(3,7,10,1,face);fill(4,8,1,4,face);fill(11,8,1,4,face);
+    fill(6,10,4,1,panel);
   }
-  // Overlapping low broken sheet-metal plates, rotated through variant placement.
-  const plates=v===0?[[1,3,6,3],[8,2,6,4],[3,9,7,3],[9,11,5,3]]:
-               v===1?[[2,2,5,4],[8,4,6,3],[1,10,6,3],[7,11,6,3]]:
-                     [[1,5,6,3],[6,2,7,3],[8,9,6,4],[3,12,6,2]];
-  for(const [x,y,w,h] of plates){
-    fill(x,y,w,h,S);fill(x+1,y,w-2,1,H);
-    for(let xx=x+1;xx<x+w-1;xx++)if((xx+y+v)%3===0)put(xx,y+1,M);
-    fill(x,y+h-1,w,1,D);
-    put(x+1,y+1,L);put(x+w-2,y+h-2,H);
-  }
-  // Dark gaps and tiny bolts emphasize a flattened debris field rather than machinery.
-  for(const [x,y] of [[4,6],[11,7],[6,12],[12,13],[3,9],[9,3]]){
-    put((x+v*2)%14+1,y,D);put((x+v*2)%14+1,y+1,H);
-  }
+  for(const [x,y] of [[2,6],[13,6],[2,11],[13,11]])P.set(x,y,bolt);
+  // Front face: narrow highlight and dark recessed gaps give 3D depth.
+  fill(2,13,12,1,face);
+  fill(4,14,3,1,edge);fill(9,14,3,1,edge);
+  P.set(3,14,rim);P.set(12,14,rim);
   return P.done();
 }
 function sprPlinth() {
@@ -1532,9 +1537,8 @@ function drawBarrel(p, m, bx, by, mech) {
 function drawPiece(p, t) {
   const x = p.x, y = p.y;
   if (p.kind === 'scrap') {
-    // Salvage piles gently flicker, vent smoke and occasionally throw welding sparks.
-    // Purely cosmetic: no movement of the blocking footprint or collision geometry.
-    ctx.drawImage(SPRITES.scrap[p.scrapV].c, x, y, 2, 2);
+    // Raised empty platform over the same 2x2 maze-blocking footprint.
+    ctx.drawImage(SPRITES.scrap[p.scrapV].c, x, y - 0.35, 2, 2.35);
     // Subtle dark metallic shimmer only: no smoke, flames or tower-like effects.
     ctx.save();
     const glimmer = 0.06 + 0.05 * (0.5 + 0.5 * Math.sin(t * 1.4 + p.ph));
