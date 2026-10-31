@@ -11,11 +11,11 @@
 /* Layout: full-screen scrollable refinery floor (canvas) with a slim gauge strip on top and a work-order panel at the bottom. */
 :root {
   color-scheme: dark;
-  --bg: #0d1013;
+  --bg: #090f16;
   --floor: #1a1f24;
-  --panel: #171c21;
-  --panel-2: #222a31;
-  --line: #36414b;
+  --panel: #121c27;
+  --panel-2: #22313e;
+  --line: #4a6271;
   --ink: #e9e4d8;
   --muted: #9aa3ab;
   --amber: #f2a93b;
@@ -44,12 +44,12 @@ body {
   display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
   padding: 8px max(10px, env(safe-area-inset-right, 0px)) 8px max(10px, env(safe-area-inset-left, 0px));
   background: linear-gradient(var(--panel), color-mix(in srgb, var(--panel) 82%, transparent));
-  border-bottom: 2px solid var(--line);
+  border-bottom: 2px solid var(--line); box-shadow: 0 3px 18px #000a, inset 0 -1px #b7d7e322;
 }
 .stat {
   display: flex; flex-direction: column; line-height: 1;
   padding: 4px 10px; min-width: 56px;
-  background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px;
+  background: linear-gradient(145deg,#30404e,var(--panel-2) 55%,#17212b); border: 1px solid var(--line); border-radius: 4px; box-shadow: inset 0 1px #ffffff1a, 0 2px 5px #0006;
 }
 .stat .lbl { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
 .stat b { font-family: var(--font-display); font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 3px; }
@@ -79,7 +79,7 @@ button.warn { border-color: var(--red); color: var(--red); }
   position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;
   padding: 10px max(12px, env(safe-area-inset-right, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
   background: color-mix(in srgb, var(--panel) 94%, transparent);
-  border-top: 2px solid var(--line);
+  border-top: 2px solid var(--line); box-shadow: 0 -5px 24px #000b, inset 0 1px #b7d7e322;
   display: flex; flex-direction: column; gap: 8px;
 }
 .hint { font-size: 15px; color: var(--ink); }
@@ -826,6 +826,23 @@ function buildFloor() {
       }
     }
   }
+  // Foundry floor overhaul: recessed service trenches, inset grates and modular riveted plates.
+  for(let y=0;y<GH;y+=4)for(let x=0;x<GW;x+=4){
+    const xx=x*sc,yy=y*sc,w=4*sc;
+    g.fillStyle='rgba(0,0,0,0.28)';g.fillRect(xx+2,yy+w-5,w-4,3);
+    g.fillStyle='rgba(124,153,169,0.17)';g.fillRect(xx+3,yy+3,w-6,1);
+    g.fillStyle='rgba(0,0,0,0.32)';g.fillRect(xx+w-5,yy+4,2,w-8);
+    if(rnd()<0.23){
+      g.fillStyle='#0c1219';g.fillRect(xx+7,yy+9,w-14,w-18);
+      g.fillStyle='#34434e';g.fillRect(xx+8,yy+10,w-16,2);
+      for(let k=12;k<w-10;k+=4){g.fillStyle=k%8?'#222e38':'#455663';g.fillRect(xx+9,yy+k,w-18,2);}
+      g.fillStyle='#b27a37';g.fillRect(xx+7,yy+9,2,2);g.fillRect(xx+w-9,yy+w-11,2,2);
+    }else if(rnd()<0.34){
+      g.fillStyle='#101820';g.fillRect(xx+6,yy+13,w-12,6);
+      g.fillStyle='#50616a';g.fillRect(xx+6,yy+13,w-12,2);
+      g.fillStyle='#c58a3c';g.fillRect(xx+9,yy+15,3,2);g.fillRect(xx+w-12,yy+15,3,2);
+    }
+  }
   // oil stains and grime
   for (let i = 0; i < 26; i++) {
     const x = rnd() * GW * sc, y = rnd() * GH * sc, rr = 4 + rnd() * 10;
@@ -1492,6 +1509,13 @@ function render() {
     }
     ctx.restore();
   }
+  // Foreground atmospheric sparks and intermittent industrial heat shimmer.
+  for(let i=0;i<10;i++){
+    const x=(i*11.83+3.2)%GW, y=(i*7.17+2.4)%GH;
+    const v=0.5+0.5*Math.sin(t*2+i*1.9);
+    ctx.fillStyle='rgba(255,165,64,'+(v*0.42)+')';
+    ctx.fillRect(x,y-((t*(0.12+i%3*0.06))%1.8),0.07,0.07);
+  }
   // Cinematic mechanical ambience: small motes of furnace embers.
   for(let i=0;i<26;i++){
     const xx=(i*13.73+2.1)%GW, yy=((i*7.19+GH*2-t*(0.12+i%4*0.08))%GH+GH)%GH;
@@ -1606,6 +1630,15 @@ function drawRefinery(t) {
     ctx.fillStyle = '#c9882b'; ctx.fillRect(x0 + tx, y0 - 0.3, 1.2, 0.3);
     ctx.fillStyle = '#8a6d3b'; ctx.fillRect(x0 + tx + 0.2, y0, 0.2, 1.4);
   }
+  // Furnace roof bracing, copper piping and warning lamps.
+  ctx.fillStyle='#141a20';ctx.fillRect(x0+0.3,y0+2.15,4.4,0.18);
+  ctx.fillStyle='#83919d';ctx.fillRect(x0+0.35,y0+2.12,4.3,0.06);
+  for(const xx of [0.35,4.45]){
+    ctx.fillStyle='#b47831';ctx.fillRect(x0+xx,y0+2.55,0.18,1.3);
+    ctx.fillStyle='#f5bc64';ctx.fillRect(x0+xx,y0+2.55,0.07,1.1);
+  }
+  ctx.fillStyle='#11171d';ctx.fillRect(x0+1.45,y0+3.6,2.1,0.65);
+  ctx.fillStyle='#f5a43d';ctx.fillRect(x0+1.6,y0+3.73,1.8,0.11);
   // chimney + smoke
   ctx.fillStyle = '#23272c'; ctx.fillRect(x0 + 3.7, y0 - 1.6, 0.7, 3.2);
   ctx.fillStyle = '#3a4048'; ctx.fillRect(x0 + 3.6, y0 - 1.75, 0.9, 0.3);
@@ -1691,6 +1724,20 @@ function drawPiece(p, t) {
       ctx.fillStyle='#d8efff';
       ctx.fillRect(ix+size*0.46,iy+size*0.43,PX*1.1,PX*1.1);
     }
+    ctx.restore();
+  }
+  // Material-specific 3D tower embellishments and subtle engine activity.
+  if(tier>=3 && !mech){
+    const pulse=0.5+0.5*Math.sin(t*(2.3+p.metal*0.17)*sp+ph);
+    ctx.save();
+    ctx.fillStyle='rgba(0,0,0,0.42)';
+    ctx.fillRect(ix+size*0.2,iy+size*0.81,size*0.62,size*0.065);
+    ctx.fillStyle=m.c[2];ctx.fillRect(ix+size*0.22,iy+size*0.79,size*0.55,size*0.035);
+    ctx.globalAlpha=0.3+0.6*pulse;
+    ctx.fillStyle=m.c[3];
+    ctx.fillRect(ix+size*0.31,iy+size*0.7,PX*1.5,PX);
+    ctx.fillRect(ix+size*0.64,iy+size*0.7,PX*1.5,PX);
+    if(p.kick>0){ctx.globalAlpha=Math.min(1,p.kick*7);ctx.fillStyle='#ffffff';ctx.fillRect(ix+size*0.4,iy+size*0.27,size*0.2,PX*2);}
     ctx.restore();
   }
   // Tier 2 foundry modules: active metal-specific lights and visible firing pulse.
@@ -1841,6 +1888,32 @@ function drawEnemy(e, t) {
   ctx.translate(e.x, foot - lift);
   if (e.dir < 0) ctx.scale(-1, 1);
   ctx.drawImage(img, -size / 2, -size, size, size);
+  ctx.restore();
+  // Enemy silhouettes gain articulated legs, layered armour and distinct attack lighting.
+  ctx.save();
+  const gait=Math.sin(t*(e.kind==='fast'?17:9)+e.ph);
+  if(!e.air){
+    const legY=foot-0.12;
+    for(const side of [-1,1]){
+      const lx=e.x+side*size*0.28;
+      ctx.fillStyle='#10151b';ctx.fillRect(lx-0.09,legY-0.32+gait*side*0.055,0.18,0.32);
+      ctx.fillStyle=e.kind==='boss'?'#8d4440':e.kind==='fast'?'#7b8790':'#50616a';
+      ctx.fillRect(lx-0.08,legY-0.26+gait*side*0.055,0.1,0.18);
+      ctx.fillStyle='#12181f';ctx.fillRect(lx-0.15,legY-0.035+gait*side*0.055,0.25,0.075);
+    }
+    if(e.kind==='boss'){
+      ctx.fillStyle='#222932';ctx.fillRect(e.x-0.75,top+0.38,0.27,0.38);ctx.fillRect(e.x+0.48,top+0.38,0.27,0.38);
+      ctx.fillStyle='#d65b42';ctx.fillRect(e.x-0.65,top+0.42,0.09,0.18);ctx.fillRect(e.x+0.56,top+0.42,0.09,0.18);
+    }else if(e.kind==='fast'){
+      ctx.fillStyle='#a9c4d0';ctx.fillRect(e.x-0.29,top+0.3,0.12,0.07);ctx.fillRect(e.x+0.17,top+0.3,0.12,0.07);
+    }
+  }else{
+    const wing=Math.sin(t*12+e.ph)*0.18;
+    ctx.fillStyle='#263443';ctx.fillRect(e.x-0.58,top+0.35+wing,0.3,0.11);
+    ctx.fillRect(e.x+0.28,top+0.35-wing,0.3,0.11);
+    ctx.fillStyle='#77c9ee';ctx.fillRect(e.x-0.51,top+0.37+wing,0.12,0.05);
+    ctx.fillRect(e.x+0.39,top+0.37-wing,0.12,0.05);
+  }
   ctx.restore();
   // Enemy motion polish: chassis exhaust, running sparks, air thruster trails.
   const stride=Math.sin(t*12+e.ph);
