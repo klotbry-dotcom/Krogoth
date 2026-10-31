@@ -409,28 +409,56 @@ function painter(w, h) {
 }
 const ROCK = ['#1b1c20', '#36383e', '#55575e', '#7a7c83'];
 function sprOre(mi) {
-  const M = METALS[mi].c, gold = METALS[mi].k === 'gold';
-  const R = gold ? [M[0], M[1], M[2], M[3]] : ROCK;
-  const P = painter(SPR, SPR);
-  for (let y = 0; y < SPR; y++) for (let x = 0; x < SPR; x++) {
-    const dx = (x - 7.5) / 5.6, dy = (y - 8.8) / 4.7;
-    const r = dx * dx + dy * dy - 0.13 * Math.sin(x * 1.7 + y * 0.9);
-    if (r > 1) continue;
-    let c = y < 7 ? R[3] : (x + y < 16 ? R[2] : R[1]);
-    if (y > 11) c = R[1];
+  // First tier: unmistakable coloured mineral node on a compact steel cradle.
+  const m = METALS[mi], M = m.c, P = painter(SPR, SPR);
+  const outline = '#111820', steel = '#45515e', shine = '#dce8f0';
+  for (let y = 11; y <= 13; y++) for (let x = 3; x <= 12; x++)
+    P.set(x, y, y === 11 ? '#75818e' : (x === 3 || x === 12 ? outline : steel));
+  for (let x = 5; x <= 10; x++) P.set(x, 14, outline);
+  // Faceted, strongly saturated metal crystal; tall enough to read on mobile.
+  for (let y = 3; y <= 11; y++) for (let x = 3; x <= 12; x++) {
+    const dx = Math.abs(x - 7.5), dy = Math.abs(y - 7);
+    if (dx * 0.88 + dy * 0.67 > 5.3) continue;
+    let c = x < 6 ? M[1] : (y < 7 ? M[3] : M[2]);
+    if (x > 9 && y > 7) c = M[1];
     P.set(x, y, c);
   }
-  const fl = [[5, 6], [9, 7], [6, 10], [10, 10], [8, 9], [11, 8]];
-  for (const [x, y] of fl) if (P.get(x, y)) { P.set(x, y, gold ? M[3] : M[2]); if (P.get(x + 1, y)) P.set(x + 1, y, gold ? '#ffffff' : M[3]); }
+  for (const [x,y] of [[6,4],[7,4],[5,6],[9,5],[10,6],[7,8],[8,9]])
+    P.set(x,y,M[3]);
+  P.set(7,5,shine); P.set(8,5,M[3]);
+  // Metal-specific top silhouette so even the starter tier is recognizable.
+  switch (m.k) {
+    case 'iron': P.set(5,3,steel); P.set(10,3,steel); P.set(7,2,M[3]); break;
+    case 'copper': P.set(4,2,M[3]); P.set(11,2,M[3]); P.set(4,1,shine); break;
+    case 'cobalt': P.set(7,1,M[3]); P.set(8,2,shine); P.set(3,6,M[3]); break;
+    case 'uranium': P.set(6,2,M[3]); P.set(9,2,M[3]); P.set(7,7,shine); break;
+    case 'tungsten': P.set(7,1,M[3]); P.set(8,1,M[3]); P.set(7,0,steel); break;
+    case 'gold': P.set(5,2,M[3]); P.set(10,2,M[3]); P.set(7,1,shine); break;
+    case 'titanium': P.set(2,5,shine); P.set(13,5,shine); P.set(7,2,M[3]); break;
+  }
   return P.done();
 }
 function sprIngot(mi) {
-  const M = METALS[mi].c, P = painter(SPR, SPR);
-  for (let x = 5; x <= 10; x++) P.set(x, 6, M[3]);
-  for (let x = 4; x <= 11; x++) P.set(x, 7, M[3]);
-  for (let y = 8; y <= 11; y++) for (let x = 3; x <= 12; x++) P.set(x, y, x === 3 || x === 12 ? M[1] : M[2]);
-  for (let x = 3; x <= 12; x++) P.set(x, 12, M[1]);
-  P.set(7, 9, M[1]); P.set(8, 9, M[1]); P.set(7, 10, M[1]);
+  // Second tier: a miniature fortified metal generator with bright top plating.
+  const m = METALS[mi], M = m.c, P = painter(SPR, SPR);
+  for (let y = 10; y <= 13; y++) for (let x = 2; x <= 13; x++)
+    P.set(x,y,y === 10 ? '#74808c' : (x === 2 || x === 13 ? '#171d24' : '#38424d'));
+  for (let y = 5; y <= 10; y++) for (let x = 4; x <= 11; x++)
+    P.set(x,y,y === 5 ? M[3] : (x === 4 || x === 11 ? M[1] : M[2]));
+  for (let x = 5; x <= 10; x++) { P.set(x,4,M[3]); P.set(x,11,M[1]); }
+  for (const x of [3,12]) { P.set(x,7,'#8d9aa6'); P.set(x,8,M[1]); P.set(x,9,'#171d24'); }
+  P.set(6,6,M[3]); P.set(9,6,M[3]);
+  P.set(7,8,'#151a20'); P.set(8,8,'#151a20');
+  P.set(7,9,M[3]); P.set(8,9,M[3]);
+  switch (m.k) {
+    case 'iron': for (const x of [4,11]) { P.set(x,3,'#697580'); P.set(x,2,'#303842'); } break;
+    case 'copper': for (const x of [3,12]) { P.set(x,3,M[3]); P.set(x,2,'#c9faff'); } break;
+    case 'cobalt': P.set(3,5,'#c9f7ff'); P.set(12,5,'#c9f7ff'); break;
+    case 'uranium': P.set(7,7,'#c4ff6e'); P.set(8,7,'#c4ff6e'); break;
+    case 'tungsten': P.set(11,2,'#9faab6'); P.set(12,2,'#9faab6'); P.set(12,1,M[3]); break;
+    case 'gold': P.set(6,3,M[3]); P.set(9,3,M[3]); P.set(7,7,'#fff4b0'); break;
+    case 'titanium': P.set(2,4,'#d9faff'); P.set(13,4,'#d9faff'); break;
+  }
   return P.done();
 }
 function sprRod(mi) {
