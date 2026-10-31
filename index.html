@@ -197,7 +197,7 @@ button.warn { border-color: var(--red); color: var(--red); }
 <div id="app">
   <canvas id="cv" aria-label="Krogoth game field"></canvas>
   <header id="hud">
-    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.22.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
+    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.23.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
     <div class="stat"><span class="lbl">Wave</span><b id="hWave">1</b></div>
     <div class="stat lives"><span class="lbl">Lives</span><b id="hLives">20</b></div>
     <div class="stat gold"><span class="lbl">Gold</span><b id="hGold">10</b></div>
@@ -1290,7 +1290,17 @@ function startWave() {
   if (w.kind === 'boss') {
     for (let i = 0; i < w.escorts; i++) S.spawnQ.push('ground');
     S.spawnQ.splice(1, 0, 'boss');
-  } else for (let i = 0; i < w.count; i++) S.spawnQ.push(w.kind);
+  } else {
+    // Mixed assaults replace repetitive single-type waves after the early tutorial.
+    for(let i=0;i<w.count;i++){
+      let kind=w.kind;
+      if(n>=5 && i%5===2) kind='fast';
+      if(n>=8 && i%7===4) kind='air';
+      if(n>=14 && i%11===8) kind='ground';
+      S.spawnQ.push(kind);
+    }
+  }
+  if(n>=6) S.texts.push({screen:true,txt:n%10===0?'BOSS ASSAULT':n%4===0?'AIR RAID + ESCORTS':n%7===0?'RAPID ASSAULT':'MIXED HOSTILES',t:0,dur:2.2});
   S.spawnT = 0.2;
   S.phase = 'wave';
   S.sel = null;
@@ -1309,9 +1319,11 @@ function spawnEnemy(kind) {
   const nodes = air ? POINTS.slice() : S.path.slice();
   const legs = air ? POINTS.map((_, i) => i) : S.legs.slice();
   const pts = nodes.map(pathPoint);
+  const elite = kind!=='boss' && n>=6 && Math.random()<Math.min(0.25,0.07+n*0.006);
+  const ehp=def.hp*(elite?2.3:1);
   S.enemies.push({
-    kind, air, hp: def.hp, max: def.hp, speed: def.spd * speedMult(n), reward: def.rew, cost: def.lives,
-    armor: Math.floor(n / 6) + (kind === 'boss' ? 3 : 0),
+    kind, air, elite, hp: ehp, max: ehp, speed: def.spd * speedMult(n)*(elite?1.08:1), reward: def.rew*(elite?3:1), cost: def.lives,
+    armor: Math.floor(n / 6) + (kind === 'boss' ? 3 : 0) + (elite?2:0),
     nodes, legs, pts, i: 0, x: pts[0][0], y: pts[0][1], prog: 0, dir: 1, alive: true, flash: 0,
     slow: 0, slowT: 0, frozen: 0, pois: 0, poisT: 0, poisSrc: null, ph: Math.random() * 6,
   });
@@ -1322,6 +1334,11 @@ function damage(e, amt, src, pierce) {
   const red = pierce ? 1 : 1 / (1 + 0.07 * e.armor);
   e.hp -= amt * red;
   e.flash = 0.08;
+  if(amt*red>0){
+    const hit=Math.round(amt*red);
+    if(hit>=2 && (Math.random()<0.3 || e.hp<=0)) S.texts.push({x:e.x+(Math.random()-.5)*0.4,y:e.y-0.9,txt:String(hit),t:0,dur:0.55});
+    S.effects.push({type:'ring',x:e.x,y:e.y-0.35,r:0.22,col:ELIGHT[e.kind],t:0,dur:0.13});
+  }
   if (e.hp <= 0) kill(e, src);
 }
 
@@ -1336,6 +1353,7 @@ function kill(e, src) {
     }
   }
   S.gold += g;
+  if(e.elite) S.texts.push({x:e.x,y:e.y-1.3,txt:'ELITE +'+g+' GOLD',t:0,dur:1.3});
   S.kills++;
   explode(e);
 }
@@ -1584,7 +1602,7 @@ function arcLift(pr) {
 }
 
 function endWave() {
-  const bonus = 4 + Math.floor(S.wave / 3);
+  const bonus = 4 + Math.floor(S.wave / 3) + (S.wave%5===0?5:0);
   S.gold += bonus;
   S.texts.push({ screen: true, txt: 'Wave ' + S.wave + ' cleared  +' + bonus + ' gold', t: 0, dur: 1.8 });
   S.wave++;
@@ -1824,6 +1842,11 @@ function drawPads(t) {
   // spawn portal
   const sx = SPAWN[0] + 1, sy = SPAWN[1] + 1;
   ctx.fillStyle = '#24103d'; ellipse(sx, sy, 1.2, 0.85);
+  // Portal ring and rotating energy ribs.
+  ctx.save();ctx.translate(sx,sy);ctx.rotate(t*0.4);ctx.strokeStyle='#8b55d5';ctx.lineWidth=0.085;
+  ctx.beginPath();ctx.ellipse(0,0,1.1,0.65,0,0,Math.PI*2);ctx.stroke();
+  for(let i=0;i<8;i++){const a=i*Math.PI/4;ctx.fillStyle=i%2?'#6b38a5':'#c39af4';ctx.fillRect(Math.cos(a)*1.05-0.075,Math.sin(a)*0.6-0.075,0.15,0.15);}
+  ctx.restore();
   ctx.fillStyle = 'rgba(211,176,255,' + (0.3 + 0.25 * Math.sin(t * 4)) + ')'; ellipse(sx, sy, 0.75, 0.5);
   for (let i = 0; i < 3; i++) {
     const a = t * 2 + i * 2.1;
@@ -1895,6 +1918,24 @@ function drawBarrel(p, m, bx, by, mech) {
   ctx.fillStyle=m.c[2];ctx.fillRect(0,-w/2,L,w*0.42);
   ctx.fillStyle=m.c[3];ctx.fillRect(L-0.085,-w/2,0.085,w);
   ctx.fillStyle='#39434d';ctx.fillRect(-0.08,-w/2-0.055,0.17,w+0.11);
+  // Weapon-family silhouettes: twin copper prongs, cryo fins, uranium vents,
+  // railgun rails, gold halo and titanium rotary muzzle.
+  switch(m.k){
+    case 'copper':
+      ctx.fillStyle=m.c[3];ctx.fillRect(L-0.04,-w/2-0.11,0.16,0.055);ctx.fillRect(L-0.04,w/2+0.055,0.16,0.055);break;
+    case 'cobalt':
+      ctx.fillStyle=m.c[3];ctx.fillRect(L*0.55,-w/2-0.14,0.13,0.12);ctx.fillRect(L*0.55,w/2+0.02,0.13,0.12);break;
+    case 'uranium':
+      ctx.fillStyle=m.c[3];for(let i=0;i<3;i++)ctx.fillRect(0.1+i*0.1,-w/2-0.08,0.05,0.06);break;
+    case 'tungsten':
+      ctx.fillStyle=m.c[3];ctx.fillRect(0,-w/2-0.11,L+0.12,0.045);ctx.fillRect(0,w/2+0.065,L+0.12,0.045);break;
+    case 'gold':
+      ctx.strokeStyle=m.c[3];ctx.lineWidth=0.05;ctx.strokeRect(L-0.08,-w/2-0.11,0.17,w+0.22);break;
+    case 'titanium':
+      ctx.fillStyle=m.c[3];for(let i=-1;i<=1;i++)ctx.fillRect(L-0.04,i*0.085-0.027,0.16,0.055);break;
+    case 'iron':
+      ctx.fillStyle=m.c[1];ctx.fillRect(L-0.02,-w/2-0.075,0.12,w+0.15);break;
+  }
   ctx.restore();
 }
 function drawPiece(p, t) {
@@ -1922,6 +1963,18 @@ function drawPiece(p, t) {
   const size = mech ? 2.3 : 2, ps = size / SPR;
   const ix = x + (2 - size) / 2, iy = y - (mech ? 0.95 : 0.75) + bob + (p.kick ? -PX : 0);
   const [bx, by] = itemCenter(p);
+  // Tier-specific industrial detailing, visible on every metal and silhouette.
+  if(tier>=3){
+    const pulse=0.5+0.5*Math.sin(t*3+ph);
+    ctx.fillStyle=hexA(m.c[3],0.32+0.35*pulse);
+    ctx.fillRect(x+0.23,y+1.48,0.2,0.12);
+    ctx.fillRect(x+1.57,y+1.48,0.2,0.12);
+    if(tier>=5){
+      ctx.fillStyle=hexA(m.c[3],0.5+0.4*pulse);
+      ctx.fillRect(x+0.17,y+1.23,0.1,0.34);
+      ctx.fillRect(x+1.73,y+1.23,0.1,0.34);
+    }
+  }
   const meltdown = mech && m.k === 'uranium';
   const behind = Math.sin(p.ang) < -0.25;
   ctx.fillStyle = 'rgba(0,0,0,0.38)'; ellipse(x + 1, y + 1.12, mech ? 0.75 : 0.6, 0.2);
@@ -2265,6 +2318,15 @@ function drawEnemy(e, t) {
     ctx.fillStyle=hexA(ELIGHT[e.kind],0.55);
     ctx.fillRect(e.x+(e.dir<0?-0.18:0.12),top+size*0.3,0.12,0.07);
   }
+  if(e.elite){
+    // Elite armour is unmistakable even when zoomed out.
+    const shine=0.65+0.35*Math.sin(t*5+e.ph);
+    ctx.strokeStyle='rgba(255,203,91,'+shine+')';ctx.lineWidth=0.075;
+    ctx.strokeRect(e.x-size*0.47,top+size*0.08,size*0.94,size*0.76);
+    ctx.fillStyle='#ffd16e';
+    ctx.fillRect(e.x-0.16,top-0.18,0.32,0.12);
+    ctx.fillRect(e.x-0.045,top-0.31,0.09,0.14);
+  }
   const w = e.kind === 'boss' ? 1.8 : 1.0, f = Math.max(0, e.hp / e.max);
   const by = top - 0.2;
   ctx.fillStyle = '#0a0c0f'; ctx.fillRect(e.x - w / 2 - 0.04, by - 0.04, w + 0.08, 0.2);
@@ -2568,6 +2630,6 @@ async function krogothCheckUpdate(){
 }
 document.getElementById('versionTag').addEventListener('click',krogothCheckUpdate);
 if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=22',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
+  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=23',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
 }
 </script>
