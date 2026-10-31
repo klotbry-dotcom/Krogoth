@@ -194,7 +194,7 @@ button.warn { border-color: var(--red); color: var(--red); }
 <div id="app">
   <canvas id="cv" aria-label="Krogoth game field"></canvas>
   <header id="hud">
-    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.16.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
+    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.17.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
     <div class="stat"><span class="lbl">Wave</span><b id="hWave">1</b></div>
     <div class="stat lives"><span class="lbl">Lives</span><b id="hLives">20</b></div>
     <div class="stat gold"><span class="lbl">Gold</span><b id="hGold">10</b></div>
@@ -1671,6 +1671,28 @@ function render() {
     }
     ctx.restore();
   }
+  // Five newly rolled metals: unmistakable floating selection flags, above all tower sprites.
+  // Permanent towers never receive these flags.
+  if(S.phase==='build'||S.phase==='choose'){
+    for(const p of pieces.values()){
+      if(!p.isNew||p.kind!=='tower')continue;
+      const x=p.x+1, y=p.y-(p.tier===6?1.95:1.72);
+      const beat=0.5+0.5*Math.sin(t*4.3+p.id*0.7);
+      const lift=0.08*Math.sin(t*3.4+p.id);
+      ctx.save();
+      ctx.translate(x,y+lift);
+      ctx.fillStyle='rgba(13,19,24,0.94)';
+      ctx.fillRect(-0.82,-0.33,1.64,0.53);
+      ctx.strokeStyle='#ffce5d';ctx.lineWidth=0.065;
+      ctx.strokeRect(-0.82,-0.33,1.64,0.53);
+      ctx.fillStyle=beat>0.42?'#ffe58e':'#e4a738';
+      ctx.font='bold 0.33px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText('NEW',0,-0.065);
+      ctx.fillStyle='#ffd15e';
+      ctx.beginPath();ctx.moveTo(-0.16,0.22);ctx.lineTo(0.16,0.22);ctx.lineTo(0,0.42);ctx.closePath();ctx.fill();
+      ctx.restore();
+    }
+  }
   // Foreground atmospheric sparks and intermittent industrial heat shimmer.
   for(let i=0;i<10;i++){
     const x=(i*11.83+3.2)%GW, y=(i*7.17+2.4)%GH;
@@ -2385,7 +2407,7 @@ window.__krogoth = {
 
 <script>
 /* Keep installed and browser versions in sync; the badge can force a fresh check. */
-const KROGOTH_VERSION='0.16.0';
+const KROGOTH_VERSION='0.17.0';
 async function krogothCheckUpdate(){
   const tag=document.getElementById('versionTag');
   if(tag){tag.querySelector('.ver-number').textContent='Checking…';tag.disabled=true;}
@@ -2405,6 +2427,6 @@ async function krogothCheckUpdate(){
 }
 document.getElementById('versionTag').addEventListener('click',krogothCheckUpdate);
 if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=16',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
+  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=17',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
 }
 </script>
