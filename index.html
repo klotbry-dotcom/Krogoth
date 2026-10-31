@@ -408,61 +408,75 @@ function painter(w, h) {
   };
 }
 const ROCK = ['#1b1c20', '#36383e', '#55575e', '#7a7c83'];
+// Starter tiers: each metal has its own industrial silhouette, lit top and shaded side.
 function sprOre(mi) {
-  // First tier: unmistakable coloured mineral node on a compact steel cradle.
-  const m = METALS[mi], M = m.c, P = painter(SPR, SPR);
-  const outline = '#111820', steel = '#45515e', shine = '#dce8f0';
-  for (let y = 11; y <= 13; y++) for (let x = 3; x <= 12; x++)
-    P.set(x, y, y === 11 ? '#75818e' : (x === 3 || x === 12 ? outline : steel));
-  for (let x = 5; x <= 10; x++) P.set(x, 14, outline);
-  // Faceted, strongly saturated metal crystal; tall enough to read on mobile.
-  for (let y = 3; y <= 11; y++) for (let x = 3; x <= 12; x++) {
-    const dx = Math.abs(x - 7.5), dy = Math.abs(y - 7);
-    if (dx * 0.88 + dy * 0.67 > 5.3) continue;
-    let c = x < 6 ? M[1] : (y < 7 ? M[3] : M[2]);
-    if (x > 9 && y > 7) c = M[1];
-    P.set(x, y, c);
-  }
-  for (const [x,y] of [[6,4],[7,4],[5,6],[9,5],[10,6],[7,8],[8,9]])
-    P.set(x,y,M[3]);
-  P.set(7,5,shine); P.set(8,5,M[3]);
-  // Metal-specific top silhouette so even the starter tier is recognizable.
-  switch (m.k) {
-    case 'iron': P.set(5,3,steel); P.set(10,3,steel); P.set(7,2,M[3]); break;
-    case 'copper': P.set(4,2,M[3]); P.set(11,2,M[3]); P.set(4,1,shine); break;
-    case 'cobalt': P.set(7,1,M[3]); P.set(8,2,shine); P.set(3,6,M[3]); break;
-    case 'uranium': P.set(6,2,M[3]); P.set(9,2,M[3]); P.set(7,7,shine); break;
-    case 'tungsten': P.set(7,1,M[3]); P.set(8,1,M[3]); P.set(7,0,steel); break;
-    case 'gold': P.set(5,2,M[3]); P.set(10,2,M[3]); P.set(7,1,shine); break;
-    case 'titanium': P.set(2,5,shine); P.set(13,5,shine); P.set(7,2,M[3]); break;
+  const m=METALS[mi],C=m.c,P=painter(SPR,SPR);
+  const dark='#1a2028',steel='#46525f',silver='#94a1ae';
+  const box=(x,y,w,h,c)=>{for(let j=y;j<y+h;j++)for(let i=x;i<x+w;i++)P.set(i,j,c);};
+  // Low 3D mounting socket, shared visual scale but not a generic crystal.
+  box(2,11,12,3,dark);box(3,10,10,2,steel);box(4,10,8,1,silver);
+  box(4,13,8,1,C[1]);
+  switch(m.k){
+    case 'iron': // squat forged ore boulder with angular fractures
+      box(4,6,8,5,C[1]);box(5,4,6,3,C[2]);box(7,3,3,2,C[3]);
+      box(4,8,3,2,C[0]);P.set(7,6,silver);P.set(8,7,C[3]);break;
+    case 'copper': // split copper ore with bright conductive vein
+      box(4,5,4,6,C[1]);box(8,4,4,7,C[2]);box(6,3,4,2,C[3]);
+      for(let y=5;y<10;y++)P.set(7,y,y%2?'#bdf7ff':C[3]);
+      P.set(3,7,C[3]);break;
+    case 'cobalt': // tall faceted icy mineral spires
+      box(4,6,4,5,C[1]);box(8,4,4,7,C[2]);
+      box(9,2,2,3,C[3]);box(5,4,2,3,C[3]);
+      P.set(9,3,'#f0fbff');P.set(6,5,'#d2efff');break;
+    case 'uranium': // shielded glowing ore capsule
+      box(4,5,8,6,C[1]);box(5,4,6,6,C[2]);
+      box(6,5,4,4,C[3]);P.set(7,6,'#f0ffc4');
+      box(3,7,2,4,steel);box(11,7,2,4,steel);break;
+    case 'tungsten': // dark jagged dense mineral
+      box(4,6,8,5,C[1]);box(5,4,6,6,C[2]);box(7,2,3,4,C[1]);
+      box(8,3,1,5,C[3]);P.set(8,2,C[3]);break;
+    case 'gold': // asymmetric golden nugget with raised crown
+      box(4,6,8,5,C[1]);box(5,4,6,6,C[2]);box(7,3,4,3,C[3]);
+      P.set(8,4,'#ffffff');P.set(5,7,C[3]);break;
+    case 'titanium': // angular pale ore shards
+      box(3,7,5,4,C[1]);box(8,5,5,6,C[2]);box(6,3,4,6,C[3]);
+      P.set(7,3,'#ffffff');P.set(11,6,'#ffffff');break;
   }
   return P.done();
 }
 function sprIngot(mi) {
-  // Second tier: a miniature fortified metal generator with bright top plating.
-  const m = METALS[mi], M = m.c, P = painter(SPR, SPR);
-  for (let y = 10; y <= 13; y++) for (let x = 2; x <= 13; x++)
-    P.set(x,y,y === 10 ? '#74808c' : (x === 2 || x === 13 ? '#171d24' : '#38424d'));
-  for (let y = 5; y <= 10; y++) for (let x = 4; x <= 11; x++)
-    P.set(x,y,y === 5 ? M[3] : (x === 4 || x === 11 ? M[1] : M[2]));
-  for (let x = 5; x <= 10; x++) { P.set(x,4,M[3]); P.set(x,11,M[1]); }
-  for (const x of [3,12]) { P.set(x,7,'#8d9aa6'); P.set(x,8,M[1]); P.set(x,9,'#171d24'); }
-  P.set(6,6,M[3]); P.set(9,6,M[3]);
-  P.set(7,8,'#151a20'); P.set(8,8,'#151a20');
-  P.set(7,9,M[3]); P.set(8,9,M[3]);
-  switch (m.k) {
-    case 'iron': for (const x of [4,11]) { P.set(x,3,'#697580'); P.set(x,2,'#303842'); } break;
-    case 'copper': for (const x of [3,12]) { P.set(x,3,M[3]); P.set(x,2,'#c9faff'); } break;
-    case 'cobalt': P.set(3,5,'#c9f7ff'); P.set(12,5,'#c9f7ff'); break;
-    case 'uranium': P.set(7,7,'#c4ff6e'); P.set(8,7,'#c4ff6e'); break;
-    case 'tungsten': P.set(11,2,'#9faab6'); P.set(12,2,'#9faab6'); P.set(12,1,M[3]); break;
-    case 'gold': P.set(6,3,M[3]); P.set(9,3,M[3]); P.set(7,7,'#fff4b0'); break;
-    case 'titanium': P.set(2,4,'#d9faff'); P.set(13,4,'#d9faff'); break;
+  const m=METALS[mi],C=m.c,P=painter(SPR,SPR);
+  const dark='#1a2028',steel='#4c5864',silver='#a3b0bb';
+  const box=(x,y,w,h,c)=>{for(let j=y;j<y+h;j++)for(let i=x;i<x+w;i++)P.set(i,j,c);};
+  // Solid raised foundry mount, with individual alloy-processing modules.
+  box(2,11,12,3,dark);box(3,10,10,2,steel);box(4,10,8,1,silver);
+  box(4,13,8,1,C[1]);
+  switch(m.k){
+    case 'iron': // stacked forged bars and riveted armour
+      box(3,7,10,4,C[1]);box(4,6,8,2,C[2]);box(5,5,6,1,C[3]);
+      box(5,8,6,1,dark);P.set(4,7,silver);P.set(11,7,silver);break;
+    case 'copper': // copper induction spool and two electrodes
+      box(4,6,8,5,C[1]);for(let y=6;y<=10;y++)box(5,y,6,1,y%2?C[3]:C[2]);
+      box(3,3,2,6,steel);box(11,3,2,6,steel);
+      P.set(3,2,'#bff8ff');P.set(12,2,'#bff8ff');break;
+    case 'cobalt': // twin cryogenic reservoirs
+      for(const x of [4,9]){box(x,5,3,6,C[1]);box(x+1,4,1,6,C[3]);box(x,4,3,1,'#c9f5ff');}
+      P.set(7,7,'#e8ffff');break;
+    case 'uranium': // enclosed green reactor flask
+      box(4,5,8,6,steel);box(5,4,6,6,C[1]);box(6,5,4,4,C[3]);
+      P.set(7,6,'#f0ffc7');box(3,7,2,3,dark);box(11,7,2,3,dark);break;
+    case 'tungsten': // dense block with red hot central filament
+      box(4,5,8,6,C[1]);box(5,4,6,2,C[2]);box(7,3,2,7,dark);
+      box(8,4,1,5,C[3]);P.set(8,3,C[3]);break;
+    case 'gold': // gold ingot stack with polished top faces
+      box(3,8,10,3,C[1]);box(4,7,8,1,C[3]);box(5,5,6,3,C[2]);
+      box(6,4,4,1,C[3]);P.set(7,5,'#ffffff');break;
+    case 'titanium': // twin streamlined alloy fins
+      box(4,5,3,6,C[1]);box(9,5,3,6,C[1]);box(5,3,2,7,C[3]);
+      box(9,3,2,7,C[2]);P.set(5,3,'#ffffff');P.set(10,3,'#ffffff');break;
   }
   return P.done();
 }
-// Tier 3–5 models use a consistent three-quarter industrial perspective:
-// bright top caps, shaded right walls, heavy bases and material-specific hardware.
 function sprRod(mi) {
   const m=METALS[mi], C=m.c, P=painter(SPR,SPR);
   const dark='#1b222a', metal='#4d5965', shine='#b2bec8';
@@ -1603,6 +1617,29 @@ function drawPiece(p, t) {
   const step = Math.floor(t * 14 * sp + ph * 10);
   ctx.fillStyle = 'rgba(255,255,255,0.75)';
   for (const [px, py] of spr.mask) if (((px + py + step) % freq + freq) % freq === 0) ctx.fillRect(ix + (flip ? 15 - px : px) * ps, iy + py * ps, ps, ps);
+  // Tier 1–2 idle glints and attack flashes use the existing phase and kick state.
+  if (tier <= 2) {
+    const twinkle = Math.sin(t * (2.1 + p.metal * 0.13) * sp + ph);
+    if (twinkle > 0.73) {
+      const sx = ix + (tier === 1 ? 0.83 : 0.64);
+      const sy = iy + (tier === 1 ? 0.53 : 0.66);
+      ctx.save();ctx.globalAlpha=(twinkle - 0.73) / 0.27;
+      ctx.fillStyle='#ffffff';
+      ctx.fillRect(sx,sy,PX*1.4,PX*1.4);
+      ctx.fillRect(sx-PX,sy+PX*0.5,PX*3.4,PX*0.45);
+      ctx.restore();
+    }
+    if (p.kick > 0) {
+      const flash = Math.min(1,p.kick / 0.12);
+      ctx.save();
+      ctx.globalAlpha=flash*0.72;
+      ctx.fillStyle=m.c[3];
+      ctx.fillRect(ix+size*0.4,iy+size*0.3,size*0.22,size*0.13);
+      ctx.fillStyle='#ffffff';
+      ctx.fillRect(ix+size*0.47,iy+size*0.32,PX*1.5,PX*1.5);
+      ctx.restore();
+    }
+  }
   if (tier === 5) {
     const a = t * 2.4 * sp + ph;
     ctx.fillStyle = m.c[3];
