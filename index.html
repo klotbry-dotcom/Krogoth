@@ -461,63 +461,87 @@ function sprIngot(mi) {
   }
   return P.done();
 }
+// Tier 3–5 models use a consistent three-quarter industrial perspective:
+// bright top caps, shaded right walls, heavy bases and material-specific hardware.
 function sprRod(mi) {
-  const m = METALS[mi], M = m.c, P = painter(SPR, SPR);
-  const wire = m.k === 'copper' || m.k === 'gold' || m.k === 'tungsten';
-  if (wire) {
-    const fl = ['#4d5259', '#757b84'];
-    for (let x = 3; x <= 12; x++) { P.set(x, 3, fl[1]); P.set(x, 4, fl[0]); P.set(x, 11, fl[1]); P.set(x, 12, fl[0]); }
-    for (let y = 5; y <= 10; y++) for (let x = 4; x <= 11; x++) {
-      let c = (y % 2) ? M[2] : M[3];
-      if (x === 4 || x === 11) c = M[1];
-      if (m.k === 'tungsten' && (x + y) % 3 === 0) c = M[1];
-      P.set(x, y, c);
+  const m=METALS[mi], C=m.c, P=painter(SPR,SPR);
+  const dark='#1b222a', metal='#4d5965', shine='#b2bec8';
+  const rect=(x,y,w,h,c)=>{for(let j=y;j<y+h;j++)for(let i=x;i<x+w;i++)P.set(i,j,c);};
+  // Raised steel cradle and two vertical side braces.
+  rect(2,12,12,2,dark);rect(3,11,10,2,metal);rect(4,13,8,1,C[1]);
+  rect(3,6,2,6,metal);rect(11,6,2,6,dark);
+  if(['copper','gold','tungsten'].includes(m.k)){
+    // Coiled conductive wire / tungsten filament wound on a spool.
+    rect(4,4,8,2,shine);rect(3,5,10,1,metal);
+    rect(5,6,6,5,C[1]);
+    for(let y=6;y<=10;y++)rect(5,y,6,1,y%2?C[2]:C[3]);
+    rect(4,11,8,1,metal);
+    if(m.k==='copper'){P.set(4,7,'#b7faff');P.set(11,9,'#b7faff');}
+    if(m.k==='gold'){P.set(6,5,'#fff9c5');P.set(9,5,'#fff9c5');}
+    if(m.k==='tungsten'){rect(7,2,2,3,C[3]);P.set(8,1,C[3]);}
+  }else{
+    // Three cylindrical rods with illuminated cap and shaded side.
+    for(let x=4;x<=10;x+=3){
+      rect(x,4,3,8,C[1]);rect(x+1,4,1,7,C[2]);rect(x,3,3,1,C[3]);
+      rect(x,11,3,1,dark);
     }
-    if (m.k === 'tungsten') { P.set(7, 7, M[3]); P.set(8, 8, M[3]); }
-  } else {
-    for (let y = 2; y <= 13; y++) {
-      P.set(6, y, M[1]); P.set(7, y, M[3]); P.set(8, y, M[2]); P.set(9, y, M[1]);
-    }
-    for (let x = 6; x <= 9; x++) { P.set(x, 2, M[1]); P.set(x, 13, M[0]); }
-    if (m.k === 'uranium') {
-      for (const y of [4, 11]) for (let x = 5; x <= 10; x++) P.set(x, y, x === 5 || x === 10 ? '#5b616a' : '#8c939c');
-    } else {
-      for (let x = 5; x <= 10; x++) P.set(x, 13, M[1]);
-    }
+    if(m.k==='uranium'){for(let x of [5,8,11])P.set(x,7,'#d6ff9a');}
+    if(m.k==='cobalt'){for(let x of [5,8,11])P.set(x,4,'#e1faff');}
+    if(m.k==='titanium'){rect(4,2,9,1,shine);}
   }
   return P.done();
 }
 function sprBolt(mi) {
-  const m = METALS[mi], M = m.c, P = painter(SPR, SPR);
-  if (m.k === 'copper') {
-    for (let y = 2; y <= 13; y++) for (let x = 6; x <= 9; x++) P.set(x, y, x === 6 ? '#3b4048' : '#5a616b');
-    for (let y = 3; y <= 12; y++) for (let x = 4; x <= 11; x++) P.set(x, y, (y % 2) ? M[2] : M[3]);
-    for (let y = 3; y <= 12; y++) { P.set(4, y, M[1]); P.set(11, y, M[1]); }
-    return P.done();
+  const m=METALS[mi], C=m.c, P=painter(SPR,SPR);
+  const dark='#1b2027', frame='#46515d', steel='#87939f';
+  const rect=(x,y,w,h,c)=>{for(let j=y;j<y+h;j++)for(let i=x;i<x+w;i++)P.set(i,j,c);};
+  // Heavy turret housing with readable lit top and deep front wall.
+  rect(2,11,12,3,dark);rect(3,10,10,3,frame);rect(3,10,10,1,steel);
+  rect(4,6,8,5,C[1]);rect(4,5,8,2,C[2]);rect(5,4,6,2,C[3]);
+  rect(10,7,2,4,C[0]);rect(5,8,5,2,dark);
+  rect(6,8,4,1,C[3]);P.set(7,9,C[2]);
+  rect(2,7,2,4,frame);rect(12,7,2,4,dark);
+  // The tier name dictates the mounted weapon / industrial equipment.
+  if(m.k==='copper'){
+    for(let y=3;y<=9;y++)rect(6,y,4,1,y%2?C[3]:C[1]);
+    rect(5,2,6,1,steel);P.set(3,6,'#b8faff');P.set(12,6,'#b8faff');
+  }else if(m.k==='uranium'){
+    rect(6,3,4,3,dark);rect(7,3,2,3,'#b9ff72');P.set(7,8,'#d5ff94');
+  }else if(m.k==='cobalt'){
+    rect(5,3,6,2,'#9fd6ff');P.set(7,8,'#c9f7ff');
+  }else if(m.k==='tungsten'){
+    rect(7,1,3,4,dark);rect(8,1,1,4,C[3]);P.set(8,0,C[3]);
+  }else if(m.k==='titanium'){
+    rect(1,5,3,2,steel);rect(12,5,3,2,steel);P.set(2,5,'#ffffff');P.set(13,5,'#ffffff');
+  }else if(m.k==='gold'){
+    rect(6,2,4,2,C[3]);P.set(7,1,'#fff7b8');
+  }else{
+    rect(3,3,3,3,frame);rect(10,3,3,3,frame);P.set(4,3,steel);P.set(11,3,steel);
   }
-  for (let x = 5; x <= 10; x++) P.set(x, 3, M[3]);
-  for (let y = 4; y <= 5; y++) for (let x = 4; x <= 11; x++) P.set(x, y, x === 4 ? M[1] : M[2]);
-  P.set(7, 4, M[3]); P.set(8, 4, M[3]);
-  for (let x = 5; x <= 10; x++) P.set(x, 6, M[1]);
-  for (let x = 3; x <= 12; x++) P.set(x, 7, M[1]);
-  for (let y = 8; y <= 13; y++) for (let x = 6; x <= 9; x++)
-    P.set(x, y, x === 9 ? M[1] : (y % 2 ? M[3] : M[2]));
   return P.done();
 }
 function sprCore(mi) {
-  const M = METALS[mi].c, P = painter(SPR, SPR);
-  const br = '#4a5059';
-  for (const [sx, sy] of [[2, 2], [13, 2], [2, 13], [13, 13]]) {
-    const dx = sx < 8 ? 1 : -1, dy = sy < 8 ? 1 : -1;
-    P.set(sx, sy, br); P.set(sx + dx, sy, br); P.set(sx + 2 * dx, sy, br);
-    P.set(sx, sy + dy, br); P.set(sx, sy + 2 * dy, br);
+  const m=METALS[mi], C=m.c, P=painter(SPR,SPR);
+  const dark='#171d25', steel='#495562', bevel='#8997a4';
+  const rect=(x,y,w,h,c)=>{for(let j=y;j<y+h;j++)for(let i=x;i<x+w;i++)P.set(i,j,c);};
+  // Chunky square reactor casing, top-lit with a visible deep front face.
+  rect(1,10,14,4,dark);rect(2,9,12,4,steel);rect(2,9,12,1,bevel);
+  rect(2,4,12,6,dark);rect(3,3,10,7,C[1]);rect(4,2,8,2,C[2]);
+  rect(4,4,8,5,C[0]);rect(5,4,6,4,C[2]);
+  rect(11,5,2,4,C[1]);rect(5,4,6,1,C[3]);
+  // Faceted power cell with 3D shaded rim.
+  for(let y=5;y<=9;y++)for(let x=5;x<=10;x++){
+    const d=Math.abs(x-7.5)+Math.abs(y-7);
+    if(d<3.8)P.set(x,y,d<1.7?C[3]:C[2]);
   }
-  for (let y = 0; y < SPR; y++) for (let x = 0; x < SPR; x++) {
-    const r = Math.hypot(x - 7.5, y - 7.5);
-    if (r <= 3.3) P.set(x, y, M[2]);
-    else if (r <= 4.6) P.set(x, y, M[1]);
-  }
-  P.set(6, 6, M[3]); P.set(7, 6, M[3]); P.set(6, 7, M[3]); P.set(7, 7, '#ffffff');
+  P.set(7,6,'#ffffff');P.set(8,6,C[3]);
+  for(const x of [3,12]){P.set(x,11,bevel);P.set(x,12,dark);}
+  if(m.k==='uranium'){P.set(7,7,'#e1ff9c');P.set(8,7,'#d1ff72');}
+  if(m.k==='cobalt'){P.set(7,7,'#e0faff');P.set(8,7,'#b4f3ff');}
+  if(m.k==='copper'){P.set(3,6,'#b9f9ff');P.set(12,6,'#b9f9ff');}
+  if(m.k==='gold'){rect(5,2,6,1,'#fff3a0');}
+  if(m.k==='tungsten'){rect(7,1,2,2,C[3]);}
+  if(m.k==='titanium'){rect(1,5,2,3,bevel);rect(13,5,2,3,bevel);}
   return P.done();
 }
 function sprMech(mi, f) {
