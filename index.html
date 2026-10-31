@@ -176,14 +176,14 @@ button.warn { border-color: var(--red); color: var(--red); }
 'use strict';
 
 /* ================= constants ================= */
-const GW = 70, GH = 50;               // Gem TD grid; enemies walk cell to cell, 1 cell is enough
+const GW = 70, GH = 54;               // Extra four rows of clearance beyond the checkpoint arms.
 const NW = GW, NH = GH;
 // Gem TD layout. Each checkpoint is a 2x2 block (top-left cell given) with no-build arms (U/D/L/R)
 // toward the lanes. The 5->6 leg crosses the 2->3 leg, so air waves pass that crossing twice.
-const SPAWN = [0, 4];
-const CPS = [[24, 4], [24, 28], [56, 28], [56, 4], [40, 4], [40, 44]];
+const SPAWN = [0, 6];
+const CPS = [[24, 6], [24, 30], [56, 30], [56, 6], [40, 6], [40, 46]];
 const CP_ARMS = ['LRD', 'UDR', 'LRU', 'UDL', 'LRD', 'UDR'];
-const REF = [66, 44];
+const REF = [66, 46];
 const POINTS = [SPAWN, ...CPS, REF];
 const SPR = 16;                       // sprite pixels per 2x2 building
 const PX = 2 / SPR;                   // one sprite pixel in cells
