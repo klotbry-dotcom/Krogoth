@@ -156,6 +156,23 @@ button.warn { border-color: var(--red); color: var(--red); }
  .odds-fab .odds-icon{width:29px;height:29px}
 }
 
+@keyframes oddsReadyPulse{
+  0%,100%{box-shadow:0 4px 14px #000b,inset 0 1px #ffe1a744,0 0 5px #d99d4055;border-color:#b88b43}
+  50%{box-shadow:0 4px 14px #000b,inset 0 1px #fff0a8cc,0 0 16px #ffd66baa,0 0 28px #f3a82b55;border-color:#ffe5a1}
+}
+@keyframes oddsReadyStar{
+  0%,100%{filter:brightness(1);transform:scale(1) rotate(-8deg)}
+  50%{filter:brightness(1.6);transform:scale(1.14) rotate(8deg)}
+}
+.odds-fab.can-upgrade{
+  color:#fff2bb;background:linear-gradient(145deg,#645029,#43331d 55%,#24272a);
+  animation:oddsReadyPulse 1.65s ease-in-out infinite;
+}
+.odds-fab.can-upgrade .odds-icon{animation:oddsReadyStar 1.65s ease-in-out infinite;color:#fff5bd}
+@media(prefers-reduced-motion:reduce){
+ .odds-fab.can-upgrade,.odds-fab.can-upgrade .odds-icon{animation:none}
+ .odds-fab.can-upgrade{border-color:#ffe5a1;box-shadow:0 0 14px #f3a82b99}
+}
 /* Persistent build marker in the top-left corner, even in installed PWA mode. */
 #versionTag{
   flex:none;display:flex;align-items:center;gap:4px;min-height:36px;
@@ -177,7 +194,7 @@ button.warn { border-color: var(--red); color: var(--red); }
 <div id="app">
   <canvas id="cv" aria-label="Krogoth game field"></canvas>
   <header id="hud">
-    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.14.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
+    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.15.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
     <div class="stat"><span class="lbl">Wave</span><b id="hWave">1</b></div>
     <div class="stat lives"><span class="lbl">Lives</span><b id="hLives">20</b></div>
     <div class="stat gold"><span class="lbl">Gold</span><b id="hGold">10</b></div>
@@ -194,12 +211,12 @@ button.warn { border-color: var(--red); color: var(--red); }
 'use strict';
 
 /* ================= constants ================= */
-const GW = 70, GH = 54;               // Extra four rows of clearance beyond the checkpoint arms.
+const GW = 70, GH = 54;               // Fixed battlefield; checkpoint 6 and refinery retain their lower positions.
 const NW = GW, NH = GH;
 // Gem TD layout. Each checkpoint is a 2x2 block (top-left cell given) with no-build arms (U/D/L/R)
 // toward the lanes. The 5->6 leg crosses the 2->3 leg, so air waves pass that crossing twice.
-const SPAWN = [0, 6];
-const CPS = [[24, 6], [24, 30], [56, 30], [56, 6], [40, 6], [40, 46]];
+const SPAWN = [0, 4];
+const CPS = [[24, 4], [24, 28], [56, 28], [56, 4], [40, 4], [40, 46]];
 const CP_ARMS = ['LRD', 'UDR', 'LRU', 'UDL', 'LRD', 'UDR'];
 const REF = [66, 46];
 const POINTS = [SPAWN, ...CPS, REF];
@@ -2313,6 +2330,11 @@ function updHud() {
     const lbl = nk.kind === 'boss' ? 'Boss + escorts' : KIND_LABEL[nk.kind] + ' ×' + nk.count;
     nextEl.innerHTML = (S.phase === 'wave' ? 'Now: ' : 'Next: ') + '<b>' + lbl + '</b>';
   }
+  // Affordability indicator follows actual upgrade cost, including max odds and game-over state.
+  const oddsButton=$('bOdds');
+  const canUpgrade=!S.over && S.odds<ODDS.length-1 && S.gold>=oddsCost(S.odds);
+  oddsButton.classList.toggle('can-upgrade',canUpgrade);
+  oddsButton.setAttribute('aria-label',canUpgrade?'Odds upgrade available — tap to open upgrade panel':'View odds and upgrades');
   const lc = document.getElementById('leftCount');
   if (lc) lc.textContent = (S.spawnQ.length + S.enemies.filter((e) => e.alive).length) + ' left.';
 }
@@ -2349,7 +2371,7 @@ window.__krogoth = {
 
 <script>
 /* Keep installed and browser versions in sync; the badge can force a fresh check. */
-const KROGOTH_VERSION='0.14.0';
+const KROGOTH_VERSION='0.15.0';
 async function krogothCheckUpdate(){
   const tag=document.getElementById('versionTag');
   if(tag){tag.querySelector('.ver-number').textContent='Checking…';tag.disabled=true;}
@@ -2369,6 +2391,6 @@ async function krogothCheckUpdate(){
 }
 document.getElementById('versionTag').addEventListener('click',krogothCheckUpdate);
 if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=14',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
+  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=15',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
 }
 </script>
