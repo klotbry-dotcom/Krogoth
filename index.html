@@ -787,38 +787,39 @@ function buildFloor() {
   const g = floorCv.getContext('2d');
   let seed = 7;
   const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  // Quiet, large-scale steel panels: subtle depth without competing with units.
   for (let py = 0; py < GH; py += 4) for (let px = 0; px < GW; px += 4) {
     const x0 = px * sc, y0 = py * sc, W = 4 * sc;
-    const shade = 28 + ((rnd() * 6) | 0);
-    g.fillStyle = 'rgb(' + (shade - 4) + ',' + shade + ',' + (shade + 6) + ')';
+    const shade = 27 + ((rnd() * 4) | 0);
+    g.fillStyle = 'rgb(' + (shade - 4) + ',' + shade + ',' + (shade + 7) + ')';
     g.fillRect(x0, y0, W, W);
-    // bevel: lit top-left edge, shadowed bottom-right edge
-    g.fillStyle = 'rgba(255,255,255,0.06)'; g.fillRect(x0, y0, W, 1); g.fillRect(x0, y0, 1, W);
-    g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(x0, y0 + W - 1, W, 1); g.fillRect(x0 + W - 1, y0, 1, W);
-    const r = rnd();
-    if (r < 0.07) {
-      // vent grate
-      g.fillStyle = '#15191d'; g.fillRect(x0 + 6, y0 + 6, W - 12, W - 12);
-      g.fillStyle = '#262c33';
-      for (let k = y0 + 8; k < y0 + W - 8; k += 3) g.fillRect(x0 + 7, k, W - 14, 1);
-    } else if (r < 0.14) {
-      // diamond tread plate
-      g.fillStyle = 'rgba(255,255,255,0.05)';
-      for (let yy = 3; yy < W - 3; yy += 4) for (let xx = 3 + ((yy >> 2) % 2) * 2; xx < W - 3; xx += 4) g.fillRect(x0 + xx, y0 + yy, 2, 1);
+    // Recessed plate joints and restrained bevel lighting.
+    g.fillStyle = 'rgba(0,0,0,0.28)';
+    g.fillRect(x0, y0 + W - 2, W, 2);
+    g.fillRect(x0 + W - 2, y0, 2, W);
+    g.fillStyle = 'rgba(151,175,188,0.09)';
+    g.fillRect(x0 + 1, y0 + 1, W - 3, 1);
+    g.fillRect(x0 + 1, y0 + 1, 1, W - 3);
+    // Sparse inset ventilation: same value range as the floor, no bold stripes.
+    if (rnd() < 0.035) {
+      g.fillStyle = '#171e26';
+      g.fillRect(x0 + 9, y0 + 10, W - 18, W - 20);
+      g.fillStyle = '#29343e';
+      for (let k = 12; k < W - 11; k += 5) g.fillRect(x0 + 11, y0 + k, W - 22, 1);
     }
-    g.fillStyle = 'rgba(160,170,180,0.18)';
-    for (const [rx, ry] of [[2, 2], [W - 3, 2], [2, W - 3], [W - 3, W - 3]]) g.fillRect(x0 + rx, y0 + ry, 1, 1);
+    // Only two small fasteners per plate.
+    g.fillStyle = 'rgba(125,145,159,0.17)';
+    g.fillRect(x0 + 3, y0 + 3, 1, 1);
+    g.fillRect(x0 + W - 4, y0 + W - 4, 1, 1);
   }
-  // oil stains and grime
-  for (let i = 0; i < 26; i++) {
-    const x = rnd() * GW * sc, y = rnd() * GH * sc, rr = 4 + rnd() * 10;
+  // Rare, faint wear marks. The build grid remains the strongest floor feature.
+  for (let i = 0; i < 13; i++) {
+    const x = rnd() * GW * sc, y = rnd() * GH * sc, rr = 3 + rnd() * 7;
     const grd = g.createRadialGradient(x, y, 0, x, y, rr);
-    grd.addColorStop(0, 'rgba(0,0,0,0.28)'); grd.addColorStop(1, 'rgba(0,0,0,0)');
-    g.fillStyle = grd; g.fillRect(x - rr, y - rr, rr * 2, rr * 2);
-  }
-  for (let i = 0; i < 900; i++) {
-    g.fillStyle = rnd() < 0.5 ? 'rgba(0,0,0,0.16)' : 'rgba(255,255,255,0.025)';
-    g.fillRect((rnd() * GW * sc) | 0, (rnd() * GH * sc) | 0, 1 + (rnd() * 2 | 0), 1);
+    grd.addColorStop(0, 'rgba(0,0,0,0.11)');
+    grd.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = grd;
+    g.fillRect(x - rr, y - rr, rr * 2, rr * 2);
   }
   // no-build zones: dark plate with hazard stripes along their outer edges
   for (let cy = 0; cy < GH; cy++) for (let cx = 0; cx < GW; cx++) {
