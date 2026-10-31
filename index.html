@@ -1502,6 +1502,63 @@ function drawPiece(p, t) {
     }
   }
   if (!meltdown && !behind) drawBarrel(p, m, bx, by + bob, mech);
+  // Refined tower detailing: animated metal-specific machinery, energy and status lighting.
+  // Drawn in world coordinates so it scales with zoom and remains pixel-crisp.
+  const beat = 0.5 + 0.5 * Math.sin(t * (mech ? 5 : 3) * sp + ph);
+  const glow = m.c[3], rim = m.c[2];
+  ctx.save();
+  ctx.fillStyle = '#111820';
+  ctx.fillRect(x + 0.22, y + 1.43, 1.56, 0.12);
+  ctx.fillStyle = rim;
+  ctx.fillRect(x + 0.28, y + 1.44, 1.44, 0.045);
+  // Riveted, illuminated plinth corners.
+  for (const xx of [0.25, 1.65]) {
+    ctx.fillStyle = '#080d12'; ctx.fillRect(x + xx, y + 1.27, 0.11, 0.13);
+    ctx.fillStyle = glow; ctx.globalAlpha = 0.4 + beat * 0.55;
+    ctx.fillRect(x + xx + 0.025, y + 1.29, 0.06, 0.06);
+    ctx.globalAlpha = 1;
+  }
+  if (tier >= 3) {
+    // Distinctive operating machinery for each metal.
+    const cx = ix + size * 0.5, cy = iy + size * 0.45;
+    ctx.lineWidth = PX * (mech ? 1.7 : 1.1);
+    if (m.k === 'copper') {
+      ctx.strokeStyle = glow; ctx.globalAlpha = 0.55 + beat * 0.45;
+      ctx.beginPath(); ctx.moveTo(cx - 0.48, cy + 0.1);
+      ctx.lineTo(cx - 0.25, cy - 0.2 - beat * 0.14);
+      ctx.lineTo(cx + 0.02, cy + 0.04);
+      ctx.lineTo(cx + 0.32, cy - 0.28);
+      ctx.stroke();
+    } else if (m.k === 'cobalt') {
+      ctx.fillStyle = glow; ctx.globalAlpha = 0.45 + beat * 0.4;
+      for (let i = 0; i < 3; i++) {
+        const a = t * 0.8 + ph + i * Math.PI * 2 / 3;
+        ctx.fillRect(cx + Math.cos(a) * 0.58, cy + Math.sin(a) * 0.32, PX * 1.5, PX * 2);
+      }
+    } else if (m.k === 'uranium') {
+      ctx.fillStyle = glow; ctx.globalAlpha = 0.2 + beat * 0.45;
+      ellipse(cx, cy, 0.32 + beat * 0.14, 0.22 + beat * 0.08);
+    } else if (m.k === 'gold') {
+      ctx.strokeStyle = glow; ctx.globalAlpha = 0.5 + beat * 0.4;
+      ctx.beginPath(); ctx.ellipse(cx, cy, 0.58, 0.23, t * 0.4, 0, Math.PI * 2); ctx.stroke();
+    } else if (m.k === 'titanium') {
+      ctx.fillStyle = glow; ctx.globalAlpha = 0.5 + beat * 0.5;
+      ctx.fillRect(cx - 0.52, cy - 0.28, 0.18, 0.08);
+      ctx.fillRect(cx + 0.34, cy - 0.28, 0.18, 0.08);
+    } else if (m.k === 'tungsten') {
+      ctx.strokeStyle = glow; ctx.globalAlpha = 0.4 + beat * 0.55;
+      ctx.beginPath(); ctx.moveTo(cx - 0.48, cy - 0.36);
+      ctx.lineTo(cx - 0.34, cy - 0.36); ctx.moveTo(cx + 0.34, cy - 0.36);
+      ctx.lineTo(cx + 0.48, cy - 0.36); ctx.stroke();
+    } else if (m.k === 'iron') {
+      ctx.fillStyle = '#0d141b'; ctx.fillRect(cx - 0.5, cy - 0.38, 0.2, 0.17);
+      ctx.fillRect(cx + 0.3, cy - 0.38, 0.2, 0.17);
+      ctx.fillStyle = glow; ctx.globalAlpha = 0.25 + beat * 0.3;
+      ctx.fillRect(cx - 0.45, cy - 0.34, 0.1, 0.05);
+      ctx.fillRect(cx + 0.35, cy - 0.34, 0.1, 0.05);
+    }
+  }
+  ctx.restore();
   if (!mech) {
     const n = tier, w = n * 0.3 - 0.06, sx = x + 1 - w / 2;
     for (let i = 0; i < n; i++) { ctx.fillStyle = m.c[3]; ctx.fillRect(sx + i * 0.3, y + 1.6, 0.24, 0.13); }
