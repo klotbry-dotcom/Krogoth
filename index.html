@@ -608,8 +608,8 @@ function sprScrap(v) {
   fill(0,5,16,8,top);
   fill(1,5,14,7,top);
   fill(0,12,16,1,face);
-  fill(1,13,14,3,wall);
-  fill(2,16,12,1,edge);
+  fill(1,13,14,4,wall);
+  fill(2,17,12,2,edge);
   fill(0,5,1,8,edge);fill(15,5,1,8,edge);
   fill(1,6,1,5,panel);fill(14,6,1,5,face);
   fill(2,5,12,1,panel);
@@ -626,9 +626,9 @@ function sprScrap(v) {
   }
   for(const [x,y] of [[2,6],[13,6],[2,11],[13,11]])P.set(x,y,bolt);
   // Front face: narrow highlight and dark recessed gaps give 3D depth.
-  fill(2,13,12,1,face);
-  fill(4,14,3,1,edge);fill(9,14,3,1,edge);
-  P.set(3,14,rim);P.set(12,14,rim);
+  fill(2,13,12,2,face);
+  fill(4,15,3,2,edge);fill(9,15,3,2,edge);
+  P.set(3,14,rim);P.set(12,14,rim);fill(1,16,14,1,wall);
   return P.done();
 }
 function sprPlinth() {
@@ -1538,7 +1538,7 @@ function drawPiece(p, t) {
   const x = p.x, y = p.y;
   if (p.kind === 'scrap') {
     // Raised empty platform over the same 2x2 maze-blocking footprint.
-    ctx.drawImage(SPRITES.scrap[p.scrapV].c, x, y - 0.35, 2, 2.35);
+    ctx.drawImage(SPRITES.scrap[p.scrapV].c, x, y - 0.65, 2, 2.65);
     // Subtle dark metallic shimmer only: no smoke, flames or tower-like effects.
     ctx.save();
     const glimmer = 0.06 + 0.05 * (0.5 + 0.5 * Math.sin(t * 1.4 + p.ph));
@@ -1953,4 +1953,4 @@ window.__krogoth = {
 })();
 </script>
 
-<script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(console.warn));}</script>
+<script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=2').catch(console.warn));}</script>
