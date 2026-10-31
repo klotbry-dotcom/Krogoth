@@ -1585,15 +1585,18 @@ function drawRefinery(t) {
   }
 }
 
+// Compact weapon mount for armed tiers only. No universal rotating barrel on ore or ingots.
 function drawBarrel(p, m, bx, by, mech) {
-  const L = (mech ? 1.0 : 0.82) - (p.kick ? p.kick * 1.6 : 0), w = mech ? 0.24 : 0.19;
+  const recoil = Math.min(0.1,(p.kick || 0)*0.7);
+  const L = (mech ? 0.58 : 0.42) - recoil, w = mech ? 0.20 : 0.16;
   ctx.save();
-  ctx.translate(bx, by); ctx.rotate(p.ang);
-  ctx.fillStyle = OUT; ctx.fillRect(-0.05, -w / 2 - 0.05, L + 0.1, w + 0.1);
-  ctx.fillStyle = m.c[1]; ctx.fillRect(0, -w / 2, L, w);
-  ctx.fillStyle = m.c[2]; ctx.fillRect(0, -w / 2, L, w * 0.4);
-  ctx.fillStyle = m.c[3]; ctx.fillRect(L - 0.14, -w / 2, 0.14, w);
-  ctx.fillStyle = '#23272d'; ctx.fillRect(-0.12, -w / 2 - 0.06, 0.26, w + 0.12);
+  ctx.translate(bx,by);ctx.rotate(p.ang);
+  // Short armoured emitter recessed into the turret, rather than a long scrolling rod.
+  ctx.fillStyle='#141b23';ctx.fillRect(0,-w/2-0.045,L+0.05,w+0.09);
+  ctx.fillStyle=m.c[1];ctx.fillRect(0,-w/2,L,w);
+  ctx.fillStyle=m.c[2];ctx.fillRect(0,-w/2,L,w*0.42);
+  ctx.fillStyle=m.c[3];ctx.fillRect(L-0.085,-w/2,0.085,w);
+  ctx.fillStyle='#39434d';ctx.fillRect(-0.08,-w/2-0.055,0.17,w+0.11);
   ctx.restore();
 }
 function drawPiece(p, t) {
@@ -1633,7 +1636,7 @@ function drawPiece(p, t) {
     ctx.fillStyle = g;
     ctx.fillRect(cx - 1.8, cy - 1.8, 3.6, 3.6);
   }
-  if (!meltdown && behind) drawBarrel(p, m, bx, by + bob, mech);
+  if (tier >= 4 && !meltdown && behind) drawBarrel(p, m, bx, by + bob, mech);
   const flip = mech && p.face < 0;
   if (flip) { ctx.save(); ctx.translate(ix + size, iy); ctx.scale(-1, 1); ctx.drawImage(spr.c, 0, 0, size, size); ctx.restore(); }
   else ctx.drawImage(spr.c, ix, iy, size, size);
@@ -1715,7 +1718,7 @@ function drawPiece(p, t) {
       ctx.fillRect(ix + size / 2 + Math.cos(a) * 1.1, iy + size / 2 + Math.sin(a) * 0.8, ps, ps);
     }
   }
-  if (!meltdown && !behind) drawBarrel(p, m, bx, by + bob, mech);
+  if (tier >= 4 && !meltdown && !behind) drawBarrel(p, m, bx, by + bob, mech);
   // Refined tower detailing: animated metal-specific machinery, energy and status lighting.
   // Drawn in world coordinates so it scales with zoom and remains pixel-crisp.
   const beat = 0.5 + 0.5 * Math.sin(t * (mech ? 5 : 3) * sp + ph);
