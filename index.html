@@ -108,6 +108,53 @@ button.warn { border-color: var(--red); color: var(--red); }
   .chip { font-size: 13px; padding: 0 8px; }
 }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }
+
+/* Compact instrument-console HUD: restrained metal panels and distinct status colours. */
+#hud{
+  gap:8px;flex-wrap:nowrap;min-height:58px;
+  padding:7px max(12px,env(safe-area-inset-right,0px)) 7px max(12px,env(safe-area-inset-left,0px));
+  background:linear-gradient(180deg,#263846 0%,#17232e 52%,#101922 100%);
+  border-bottom:2px solid #68808b;
+}
+#hud .stat{
+  position:relative;min-width:66px;padding:5px 11px 6px 13px;
+  border-radius:5px;border:1px solid #435968;
+  background:linear-gradient(160deg,#1b2935,#101820);
+  box-shadow:inset 0 1px #829aa322,0 2px 5px #0008;
+}
+#hud .stat:before{content:"";position:absolute;left:4px;top:7px;bottom:7px;width:3px;background:#76b9c9;border-radius:2px}
+#hud .stat.lives:before{background:#ff665a}
+#hud .stat.gold:before{background:#f3bb5a}
+#hud .stat .lbl{font-size:10px;letter-spacing:.15em}
+#hud .stat b{font-size:22px;text-shadow:0 1px 3px #000a}
+#bSpeed{min-width:58px;border:1px solid #658493;background:linear-gradient(#304657,#1a2b38);box-shadow:inset 0 1px #b4d6e533;font-size:17px}
+.odds-fab{
+  position:absolute;z-index:5;right:max(12px,env(safe-area-inset-right,0px));
+  bottom:calc(14px + env(safe-area-inset-bottom,0px) + var(--panel-height, 65px));
+  display:flex;align-items:center;justify-content:center;gap:7px;
+  min-height:46px;padding:5px 12px 5px 7px;
+  border:2px solid #a87b37;border-radius:10px;
+  background:linear-gradient(145deg,#3e3b2b,#242b30 55%,#131b23);
+  color:#ffdf96;font-family:var(--font-display);font-size:15px;
+  box-shadow:0 4px 14px #000b,inset 0 1px #ffe1a744;
+}
+.odds-fab .odds-icon{
+  display:grid;place-items:center;width:32px;height:32px;
+  color:#ffe9a7;font-size:25px;text-shadow:0 0 8px #ffb93b;
+  border:2px solid #a88036;border-radius:7px;
+  background:radial-gradient(circle at 35% 30%,#a77d3b,#59421f 55%,#241e1c);
+  box-shadow:inset 0 1px #ffdd8c88,0 0 8px #d7963033;
+}
+.odds-fab:active{transform:translateY(1px)}
+@media(max-width:460px){
+ #hud{gap:5px;padding:6px 8px;min-height:54px}
+ #hud .stat{min-width:0;padding:5px 7px 5px 11px}
+ #hud .stat b{font-size:19px}
+ #hud .stat .lbl{font-size:9px}
+ #bSpeed{min-width:48px;padding:0 8px}
+ .odds-fab{right:10px;min-height:42px;font-size:13px}
+ .odds-fab .odds-icon{width:29px;height:29px}
+}
 </style>
 
 <div id="app">
@@ -117,10 +164,10 @@ button.warn { border-color: var(--red); color: var(--red); }
     <div class="stat lives"><span class="lbl">Lives</span><b id="hLives">20</b></div>
     <div class="stat gold"><span class="lbl">Gold</span><b id="hGold">10</b></div>
     <div class="spacer"></div>
-    <button id="bOdds" class="chip" type="button">Odds 0</button>
     <button id="bSpeed" class="chip" type="button">1×</button>
   </header>
   <div id="next"></div>
+  <button id="bOdds" class="odds-fab" type="button" aria-label="Upgrade tower odds" title="Upgrade tower odds"><span class="odds-icon" aria-hidden="true">✦</span><span id="oddsText">ODDS 0</span></button>
   <section id="panel" aria-live="polite"></section>
 </div>
 
@@ -129,14 +176,14 @@ button.warn { border-color: var(--red); color: var(--red); }
 'use strict';
 
 /* ================= constants ================= */
-const GW = 70, GH = 46;               // Gem TD grid; enemies walk cell to cell, 1 cell is enough
+const GW = 70, GH = 50;               // Gem TD grid; enemies walk cell to cell, 1 cell is enough
 const NW = GW, NH = GH;
 // Gem TD layout. Each checkpoint is a 2x2 block (top-left cell given) with no-build arms (U/D/L/R)
 // toward the lanes. The 5->6 leg crosses the 2->3 leg, so air waves pass that crossing twice.
-const SPAWN = [0, 2];
-const CPS = [[24, 2], [24, 26], [56, 26], [56, 2], [40, 2], [40, 42]];
+const SPAWN = [0, 4];
+const CPS = [[24, 4], [24, 28], [56, 28], [56, 4], [40, 4], [40, 44]];
 const CP_ARMS = ['LRD', 'UDR', 'LRU', 'UDL', 'LRD', 'UDR'];
-const REF = [66, 42];
+const REF = [66, 44];
 const POINTS = [SPAWN, ...CPS, REF];
 const SPR = 16;                       // sprite pixels per 2x2 building
 const PX = 2 / SPR;                   // one sprite pixel in cells
@@ -581,6 +628,12 @@ function sprMech(mi, f) {
   for (let y = 2 + b; y <= 4 + b; y++) for (let x = 6; x <= 9; x++) P.set(x, y, y === 2 + b ? M[3] : M[2]);
   const eye = m.k === 'tungsten' ? '#ff3b30' : '#ffd23f';
   P.set(7, 3 + b, eye); P.set(8, 3 + b, eye);
+  // Three-quarter armour: brighter upper edge, darker right flank and inset vents.
+  for(let x=4;x<=11;x++)P.set(x,5+b,M[3]);
+  for(let y=6+b;y<=10;y++)P.set(12,y,M[0]);
+  for(let y=7+b;y<=10;y++)P.set(4,y,M[1]);
+  P.set(5,6+b,'#aab4bd');P.set(10,6+b,M[3]);
+  P.set(5,10,M[0]);P.set(10,10,M[0]);
   // arms / weapons
   for (let y = 6 + b; y <= 9 + b; y++) { P.set(1, y, M[1]); P.set(2, y, M[2]); P.set(13, y, M[2]); P.set(14, y, M[1]); }
   switch (m.k) {
@@ -1849,6 +1902,7 @@ function drawEnemy(e, t) {
   const size = e.kind === 'boss' ? 2.2 : (e.air ? 1.35 : (e.kind === 'fast' ? 1.25 : 1.3));
   const lift = e.air ? 0.95 + Math.sin(t * 4 + e.ph) * 0.12 : 0;
   const foot = e.y + 0.4;
+  const top = foot - lift - size;
   ctx.fillStyle = e.air ? 'rgba(0,0,0,0.22)' : 'rgba(0,0,0,0.4)';
   ellipse(e.x, foot - 0.06, size * 0.36, size * 0.12);
   ctx.save();
@@ -1899,7 +1953,6 @@ function drawEnemy(e, t) {
     ctx.fillStyle='rgba(111,236,102,0.27)';
     ctx.fillRect(e.x-e.dir*0.3,foot-0.42,0.12,0.12);
   }
-  const top = foot - lift - size;
   // hostile light glow
   const lg = 0.3 + 0.25 * Math.sin(t * 6 + e.ph);
   ctx.fillStyle = hexA(ELIGHT[e.kind], lg * 0.5); ellipse(e.x + (e.dir < 0 ? -1 : 1) * size * 0.25, top + size * 0.45, size * 0.18, size * 0.12);
@@ -2109,6 +2162,7 @@ function renderPanel() {
     else h += '<div class="hint">Wave ' + S.wave + ' (' + KIND_LABEL[waveInfo(S.wave).kind] + '). <span class="dim" id="leftCount">' + left + ' left.</span></div>';
   }
   panel.innerHTML = h;
+  document.documentElement.style.setProperty('--panel-height',panel.offsetHeight+'px');
   paintCardCanvases();
   const keepFit = Math.abs(cam.s - cam.fit) < 1e-6;
   if (keepFit) { /* panel height may have changed; refit gently */ }
@@ -2143,7 +2197,7 @@ function updHud() {
     $('hWave').textContent = S.wave;
     $('hLives').textContent = S.lives;
     $('hGold').textContent = S.gold;
-    $('bOdds').textContent = 'Odds ' + S.odds;
+    $('oddsText').textContent = 'ODDS ' + S.odds;
     $('bSpeed').textContent = S.speed + '×';
     const lbl = nk.kind === 'boss' ? 'Boss + escorts' : KIND_LABEL[nk.kind] + ' ×' + nk.count;
     nextEl.innerHTML = (S.phase === 'wave' ? 'Now: ' : 'Next: ') + '<b>' + lbl + '</b>';
