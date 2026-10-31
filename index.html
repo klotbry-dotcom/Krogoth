@@ -1442,6 +1442,30 @@ function render() {
   for (const e of S.enemies) if (e.alive && e.air) drawEnemy(e, t);
   for (const pr of S.proj) drawProj(pr, t);
   for (const f of S.effects) drawEffect(f);
+  // Always-on-top floating tier indicators: remain legible beside tall towers and scrap.
+  for (const p of pieces.values()) {
+    if (p.kind !== 'tower') continue;
+    const m = METALS[p.metal];
+    const float = Math.sin(t * 2.3 * p.sp + p.ph) * 0.075;
+    const cx = p.x + 1, cy = p.y - (p.tier === 6 ? 1.12 : 0.93) + float;
+    const n = p.tier, spacing = n > 4 ? 0.22 : 0.27;
+    const width = Math.max(0.48, n * spacing + 0.14);
+    ctx.save();
+    ctx.fillStyle='rgba(9,14,20,0.88)';
+    ctx.fillRect(cx-width/2,cy-0.16,width,0.35);
+    ctx.strokeStyle=m.c[2];ctx.lineWidth=0.035;
+    ctx.strokeRect(cx-width/2,cy-0.16,width,0.35);
+    for(let i=0;i<n;i++){
+      const px=cx+(i-(n-1)/2)*spacing;
+      const pulse=0.75+0.25*Math.sin(t*3+p.ph+i*0.6);
+      ctx.fillStyle=m.c[3];ctx.globalAlpha=pulse;
+      ctx.beginPath();
+      ctx.moveTo(px,cy-0.11);ctx.lineTo(px+0.075,cy);
+      ctx.lineTo(px,cy+0.11);ctx.lineTo(px-0.075,cy);
+      ctx.closePath();ctx.fill();
+    }
+    ctx.restore();
+  }
   // drifting dust
   for (const d of S.dust) { ctx.fillStyle = 'rgba(200,210,220,' + d.a + ')'; ctx.fillRect(d.x, d.y, 0.08, 0.08); }
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -1617,6 +1641,39 @@ function drawPiece(p, t) {
   const step = Math.floor(t * 14 * sp + ph * 10);
   ctx.fillStyle = 'rgba(255,255,255,0.75)';
   for (const [px, py] of spr.mask) if (((px + py + step) % freq + freq) % freq === 0) ctx.fillRect(ix + (flip ? 15 - px : px) * ps, iy + py * ps, ps, ps);
+  // Tier 2 foundry modules: active metal-specific lights and visible firing pulse.
+  if (tier === 2) {
+    const energy = 0.5 + 0.5 * Math.sin(t * (3.4 + p.metal * 0.2) * sp + ph);
+    const ax=ix+size*0.5, ay=iy+size*0.49;
+    ctx.save();ctx.globalAlpha=0.28+energy*0.55;
+    ctx.fillStyle=m.c[3];
+    if(m.k==='copper'){
+      ctx.fillRect(ax-0.43,ay-0.29,PX*2,PX*2);
+      ctx.fillRect(ax+0.36,ay-0.29,PX*2,PX*2);
+    }else if(m.k==='cobalt'){
+      ctx.fillRect(ax-0.33,ay-0.35,PX*2,PX*3);
+      ctx.fillRect(ax+0.25,ay-0.35,PX*2,PX*3);
+    }else if(m.k==='uranium'){
+      ctx.beginPath();ctx.arc(ax,ay,0.12+energy*0.08,0,Math.PI*2);ctx.fill();
+    }else if(m.k==='tungsten'){
+      ctx.fillRect(ax-0.04,ay-0.36,PX*1.5,0.44);
+    }else if(m.k==='gold'){
+      ctx.fillRect(ax-0.34,ay-0.25,0.3,PX);
+      ctx.fillRect(ax+0.15,ay-0.1,0.25,PX);
+    }else if(m.k==='titanium'){
+      ctx.fillRect(ax-0.45,ay-0.34,PX*2,PX*2);
+      ctx.fillRect(ax+0.36,ay-0.34,PX*2,PX*2);
+    }else{
+      ctx.fillRect(ax-0.4,ay-0.2,PX*2,PX);
+      ctx.fillRect(ax+0.3,ay-0.2,PX*2,PX);
+    }
+    if(p.kick>0){
+      ctx.globalAlpha=Math.min(1,p.kick/0.12)*0.8;
+      ctx.fillStyle='#ffffff';
+      ctx.fillRect(ax-0.19,ay-0.21,0.38,0.11);
+    }
+    ctx.restore();
+  }
   // Tier 1–2 idle glints and attack flashes use the existing phase and kick state.
   if (tier <= 2) {
     const twinkle = Math.sin(t * (2.1 + p.metal * 0.13) * sp + ph);
@@ -1716,10 +1773,7 @@ function drawPiece(p, t) {
     }
   }
   ctx.restore();
-  if (!mech) {
-    const n = tier, w = n * 0.3 - 0.06, sx = x + 1 - w / 2;
-    for (let i = 0; i < n; i++) { ctx.fillStyle = m.c[3]; ctx.fillRect(sx + i * 0.3, y + 1.6, 0.24, 0.13); }
-  } else { ctx.fillStyle = m.c[3]; ctx.fillRect(x + 0.55, y + 1.6, 0.9, 0.13); }
+  // Tier markers are rendered in a final foreground pass, never under neighbouring towers.
 }
 
 function drawEnemy(e, t) {
