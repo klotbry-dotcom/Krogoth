@@ -596,24 +596,50 @@ function sprMech(mi, f) {
   return out;
 }
 function sprScrap(v) {
-  // 3/4 view: each block shows a lit top face and a darker front face.
+  // Three distinctive wreckage silhouettes: collapsed engine, broken walker, shattered turret.
+  // 16x20 pixel art in the existing isometric-ish industrial palette.
   const P = painter(SPR, 20);
-  const TOP = ['#4f565f', '#5d656f'], FRONT = ['#2c3138', '#23272d'], RUST = ['#5c321b', '#7d4523'];
-  let seed = 17 + v * 101;
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  const blocks = v === 0 ? [[1, 5, 8, 6, 4], [7, 2, 8, 6, 4], [3, 9, 10, 6, 4]] :
-                 v === 1 ? [[2, 3, 6, 6, 4], [8, 6, 7, 6, 4], [1, 9, 8, 6, 4]] :
-                           [[3, 2, 10, 7, 4], [1, 8, 6, 7, 4], [8, 9, 7, 6, 4]];
-  for (const [bx, by, bw, bt, bd] of blocks) {
-    for (let y = by; y < by + bt + bd && y < 20; y++) for (let x = bx; x < bx + bw && x < 16; x++) {
-      const top = y < by + bt;
-      let c = top ? TOP[(x + y) % 2] : FRONT[(y - by - bt) % 2];
-      if (top && y === by) c = '#6c747e';
-      if (!top && (x === bx || x === bx + bw - 1)) c = '#1c2025';
-      if (rnd() < 0.1) c = RUST[(rnd() * 2) | 0];
-      P.set(x, y, c);
-    }
+  const edge = '#171c23', shadow = '#252c34', steel = '#4b5661';
+  const light = '#8b99a5', glint = '#c3cbd1', rust = '#995c34', copper = '#ce8750';
+  const rect = (x,y,w,h,c) => { for(let yy=y;yy<y+h;yy++) for(let xx=x;xx<x+w;xx++) P.set(xx,yy,c); };
+  const line = (x1,y1,x2,y2,c) => {
+    let dx=Math.abs(x2-x1),dy=-Math.abs(y2-y1),sx=x1<x2?1:-1,sy=y1<y2?1:-1,err=dx+dy;
+    while(true){P.set(x1,y1,c);if(x1===x2&&y1===y2)break;const e=2*err;if(e>=dy){err+=dy;x1+=sx;}if(e<=dx){err+=dx;y1+=sy;}}
+  };
+  // Dark, uneven ground footprint with a highlighted metal lip.
+  rect(2,15,12,2,edge); rect(3,14,10,2,shadow);
+  for (let x=3;x<13;x+=3) P.set(x,15,rust);
+  if(v===0) {
+    // Crushed engine block, exposed piston, severed copper tubing.
+    rect(2,9,11,6,edge);rect(3,8,9,6,steel);rect(4,8,7,2,light);
+    rect(4,11,6,2,shadow);rect(5,11,4,1,rust);
+    rect(5,5,3,4,steel);rect(5,4,3,1,glint);rect(6,6,1,3,edge);
+    rect(9,5,3,5,shadow);rect(10,4,2,2,light);
+    line(2,12,5,9,copper);line(5,9,9,10,copper);
+    rect(11,11,3,2,rust);P.set(12,10,glint);
+    for(const x of [4,8,11])P.set(x,13,light);
+  } else if(v===1) {
+    // Destroyed bipedal robot: torso, fallen arm and angular legs.
+    rect(5,7,7,7,edge);rect(6,6,5,7,steel);rect(7,6,3,2,light);
+    rect(7,9,3,2,shadow);P.set(8,9,'#e98d48');
+    rect(7,3,4,4,edge);rect(8,3,3,3,light);P.set(9,4,'#ffbc65');
+    line(5,9,2,12,steel);line(2,12,1,15,shadow);
+    line(11,9,14,11,steel);line(14,11,13,14,rust);
+    line(7,12,5,16,light);line(10,12,12,16,steel);
+    rect(3,15,4,2,edge);rect(10,15,4,2,edge);
+    P.set(3,12,glint);P.set(13,11,copper);
+  } else {
+    // Blasted gun turret: split armour, bent barrel, exposed gear wheel.
+    rect(3,10,11,5,edge);rect(4,9,9,5,steel);
+    rect(5,8,7,2,light);rect(6,11,5,2,shadow);
+    rect(5,5,5,4,edge);rect(6,4,4,4,steel);rect(7,4,2,1,glint);
+    line(9,6,13,3,light);line(13,3,15,4,edge);P.set(13,2,rust);
+    rect(2,11,3,3,rust);rect(11,12,3,2,shadow);
+    for(const [x,y] of [[8,12],[7,11],[9,11],[8,10]])P.set(x,y,copper);
+    P.set(8,11,edge);P.set(6,7,rust);P.set(10,8,glint);
   }
+  // Jagged debris at the base, distinct from intact towers.
+  P.set(1,16,rust);P.set(14,15,steel);P.set(3,17,shadow);P.set(12,17,rust);
   return P.done();
 }
 function sprPlinth() {
