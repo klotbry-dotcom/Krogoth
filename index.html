@@ -155,11 +155,29 @@ button.warn { border-color: var(--red); color: var(--red); }
  .odds-fab{right:10px;min-height:42px;font-size:13px}
  .odds-fab .odds-icon{width:29px;height:29px}
 }
+
+/* Persistent build marker in the top-left corner, even in installed PWA mode. */
+#versionTag{
+  flex:none;display:flex;align-items:center;gap:4px;min-height:36px;
+  padding:3px 7px 3px 4px;border:1px solid #6b8c9b;border-radius:5px;
+  background:linear-gradient(155deg,#304653,#111e28);color:#bde4ee;
+  box-shadow:inset 0 1px #d2f7ff2b,0 2px 6px #0008;
+  font:700 12px var(--font-display);letter-spacing:.01em;white-space:nowrap;
+}
+#versionTag .ver-mark{display:grid;place-items:center;width:23px;height:25px;background:#a87830;border:1px solid #e4b765;border-radius:3px;color:#171e24;font-size:19px;text-shadow:0 1px #f9dca5}
+#versionTag .ver-refresh{font-size:17px;color:#f1bc66}
+#versionTag:active{transform:translateY(1px)}
+@media(max-width:460px){
+ #versionTag{font-size:11px;gap:3px;padding:2px 4px;min-height:34px}
+ #versionTag .ver-mark{width:20px;height:23px;font-size:17px}
+ #versionTag .ver-refresh{font-size:15px}
+}
 </style>
 
 <div id="app">
   <canvas id="cv" aria-label="Krogoth game field"></canvas>
   <header id="hud">
+    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.14.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
     <div class="stat"><span class="lbl">Wave</span><b id="hWave">1</b></div>
     <div class="stat lives"><span class="lbl">Lives</span><b id="hLives">20</b></div>
     <div class="stat gold"><span class="lbl">Gold</span><b id="hGold">10</b></div>
@@ -2329,4 +2347,28 @@ window.__krogoth = {
 })();
 </script>
 
-<script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=12').catch(console.warn));}</script>
+<script>
+/* Keep installed and browser versions in sync; the badge can force a fresh check. */
+const KROGOTH_VERSION='0.14.0';
+async function krogothCheckUpdate(){
+  const tag=document.getElementById('versionTag');
+  if(tag){tag.querySelector('.ver-number').textContent='Checking…';tag.disabled=true;}
+  try{
+    if('serviceWorker' in navigator){
+      const reg=await navigator.serviceWorker.getRegistration();
+      if(reg)await reg.update();
+    }
+    // Cache-busting navigation so both normal tabs and installed PWAs fetch current HTML.
+    const url=new URL(location.href);
+    url.searchParams.set('build',String(Date.now()));
+    location.replace(url.href);
+  }catch(e){
+    if(tag){tag.disabled=false;tag.querySelector('.ver-number').textContent='v'+KROGOTH_VERSION;}
+    console.warn('Krogoth update check:',e);
+  }
+}
+document.getElementById('versionTag').addEventListener('click',krogothCheckUpdate);
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=14',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
+}
+</script>
