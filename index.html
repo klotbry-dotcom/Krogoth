@@ -809,40 +809,6 @@ function buildFloor() {
     g.fillStyle = 'rgba(160,170,180,0.18)';
     for (const [rx, ry] of [[2, 2], [W - 3, 2], [2, W - 3], [W - 3, W - 3]]) g.fillRect(x0 + rx, y0 + ry, 1, 1);
   }
-  // Industrial environment: inset seams, inset rivets, maintenance conduits and warm utility lights.
-  for(let y=0;y<GH*sc;y+=sc*2){
-    for(let x=0;x<GW*sc;x+=sc*2){
-      g.fillStyle='rgba(7,11,17,0.34)';g.fillRect(x+1,y+1,sc*2-2,1);
-      g.fillStyle='rgba(126,149,166,0.12)';g.fillRect(x+2,y+2,sc*2-4,1);
-      if(rnd()<0.32){
-        g.fillStyle='#0e141b';g.fillRect(x+sc-2,y+3,4,sc*2-6);
-        g.fillStyle='#4b5e6a';g.fillRect(x+sc-1,y+4,1,sc*2-8);
-        for(let k=4;k<sc*2-3;k+=6){g.fillStyle='#d38c3b';g.fillRect(x+sc,y+k,2,2);}
-      }
-      if(rnd()<0.19){
-        g.fillStyle='#0b1118';g.fillRect(x+3,y+sc-3,sc*2-6,6);
-        g.fillStyle='#344653';g.fillRect(x+4,y+sc-2,sc*2-8,2);
-        g.fillStyle='#c68b42';g.fillRect(x+6,y+sc-1,2,1);
-      }
-    }
-  }
-  // Foundry floor overhaul: recessed service trenches, inset grates and modular riveted plates.
-  for(let y=0;y<GH;y+=4)for(let x=0;x<GW;x+=4){
-    const xx=x*sc,yy=y*sc,w=4*sc;
-    g.fillStyle='rgba(0,0,0,0.28)';g.fillRect(xx+2,yy+w-5,w-4,3);
-    g.fillStyle='rgba(124,153,169,0.17)';g.fillRect(xx+3,yy+3,w-6,1);
-    g.fillStyle='rgba(0,0,0,0.32)';g.fillRect(xx+w-5,yy+4,2,w-8);
-    if(rnd()<0.23){
-      g.fillStyle='#0c1219';g.fillRect(xx+7,yy+9,w-14,w-18);
-      g.fillStyle='#34434e';g.fillRect(xx+8,yy+10,w-16,2);
-      for(let k=12;k<w-10;k+=4){g.fillStyle=k%8?'#222e38':'#455663';g.fillRect(xx+9,yy+k,w-18,2);}
-      g.fillStyle='#b27a37';g.fillRect(xx+7,yy+9,2,2);g.fillRect(xx+w-9,yy+w-11,2,2);
-    }else if(rnd()<0.34){
-      g.fillStyle='#101820';g.fillRect(xx+6,yy+13,w-12,6);
-      g.fillStyle='#50616a';g.fillRect(xx+6,yy+13,w-12,2);
-      g.fillStyle='#c58a3c';g.fillRect(xx+9,yy+15,3,2);g.fillRect(xx+w-12,yy+15,3,2);
-    }
-  }
   // oil stains and grime
   for (let i = 0; i < 26; i++) {
     const x = rnd() * GW * sc, y = rnd() * GH * sc, rr = 4 + rnd() * 10;
