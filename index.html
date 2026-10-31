@@ -194,7 +194,7 @@ button.warn { border-color: var(--red); color: var(--red); }
 <div id="app">
   <canvas id="cv" aria-label="Krogoth game field"></canvas>
   <header id="hud">
-    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.18.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
+    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.19.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
     <div class="stat"><span class="lbl">Wave</span><b id="hWave">1</b></div>
     <div class="stat lives"><span class="lbl">Lives</span><b id="hLives">20</b></div>
     <div class="stat gold"><span class="lbl">Gold</span><b id="hGold">10</b></div>
@@ -248,12 +248,18 @@ function tierLabel(mi, t) {
 }
 function pieceName(mi, t) { return METALS[mi].name + ' ' + tierLabel(mi, t); }
 
-// Chance of each starting tier (Ore, Ingot, Rod, Bolt) per odds level
+// Starting-tier probabilities: six tiers, including 5-star Cores and 6-star Mechs.
+// Each row sums to 100; higher Metal Chance levels unlock rare top-tier rolls.
 const ODDS = [
-  [100, 0, 0, 0], [75, 25, 0, 0], [60, 30, 10, 0], [50, 30, 20, 0], [40, 30, 22, 8],
-  [30, 32, 26, 12], [20, 32, 30, 18], [12, 30, 33, 25], [5, 25, 35, 35],
+  [100,0,0,0,0,0], [75,25,0,0,0,0], [60,30,10,0,0,0],
+  [50,30,20,0,0,0], [40,30,22,8,0,0], [30,32,26,12,0,0],
+  [20,32,30,18,0,0], [12,30,33,25,0,0], [5,25,35,35,0,0],
+  [5,20,32,38,5,0], [4,16,29,40,11,0], [3,13,25,42,16,1],
+  [2,10,21,42,22,3], [1,8,18,40,28,5], [1,6,14,37,34,8],
+  [0,4,11,32,41,12], [0,3,8,27,45,17], [0,2,6,22,48,22],
+  [0,1,4,18,50,27], [0,0,3,15,50,32],
 ];
-const oddsCost = (l) => Math.round(12 * Math.pow(l + 1, 1.45));
+const oddsCost = (l) => Math.round(12 * Math.pow(l + 1, 1.35));
 
 /* ================= state ================= */
 let S;
@@ -422,7 +428,7 @@ function addPiece(x, y, metal, tier) {
 function rollTier() {
   const row = ODDS[S.odds];
   let r = Math.random() * 100;
-  for (let i = 0; i < 4; i++) { r -= row[i]; if (r < 0) return i + 1; }
+  for (let i = 0; i < row.length; i++) { r -= row[i]; if (r < 0) return i + 1; }
   return 1;
 }
 function towers() { const a = []; for (const p of pieces.values()) if (p.kind === 'tower') a.push(p); return a; }
@@ -2064,19 +2070,21 @@ function drawEnemy(e, t) {
   const spr = (e.flash > 0 ? SPRITES.enemyW : SPRITES.enemy)[e.kind][fr];
   const img = spr.c || spr;
   const size = e.kind === 'boss' ? 2.2 : (e.air ? 1.35 : (e.kind === 'fast' ? 1.25 : 1.3));
-  const lift = e.air ? 0.95 + Math.sin(t * 4 + e.ph) * 0.12 : 0;
+  const gaitPhase = t * (e.kind === 'fast' ? 17 : e.kind === 'boss' ? 5.2 : 9) + e.ph;
+  const lift = e.air ? 0.95 + Math.sin(t * 4 + e.ph) * 0.12 : (e.frozen > 0 ? 0 : Math.abs(Math.sin(gaitPhase)) * (e.kind === 'fast' ? 0.085 : e.kind === 'boss' ? 0.028 : 0.045));
   const foot = e.y + 0.4;
   const top = foot - lift - size;
   ctx.fillStyle = e.air ? 'rgba(0,0,0,0.22)' : 'rgba(0,0,0,0.4)';
   ellipse(e.x, foot - 0.06, size * 0.36, size * 0.12);
   ctx.save();
   ctx.translate(e.x, foot - lift);
+  if (!e.air && e.frozen <= 0) ctx.rotate(Math.sin(gaitPhase) * (e.kind === 'fast' ? 0.065 : e.kind === 'boss' ? 0.014 : 0.027));
   if (e.dir < 0) ctx.scale(-1, 1);
   ctx.drawImage(img, -size / 2, -size, size, size);
   ctx.restore();
   // Enemy silhouettes gain articulated legs, layered armour and distinct attack lighting.
   ctx.save();
-  const gait=Math.sin(t*(e.kind==='fast'?17:9)+e.ph);
+  const gait=e.frozen>0?0:Math.sin(gaitPhase);
   if(!e.air){
     const legY=foot-0.12;
     for(const side of [-1,1]){
@@ -2116,6 +2124,28 @@ function drawEnemy(e, t) {
   }else{
     ctx.fillStyle='rgba(111,236,102,0.27)';
     ctx.fillRect(e.x-e.dir*0.3,foot-0.42,0.12,0.12);
+  }
+  // Distinctive propulsion details: fast runners leave a bright trailing skid;
+  // bosses carry pulsing red exhaust; airborne units oscillate twin jet trails.
+  if(e.kind==='fast' && e.frozen<=0){
+    ctx.fillStyle='rgba(255,188,84,'+(0.17+0.22*Math.abs(gait))+')';
+    ctx.fillRect(e.x-e.dir*0.53,foot-0.11,0.24+0.12*Math.abs(gait),0.055);
+    ctx.fillStyle='rgba(245,223,162,0.65)';
+    ctx.fillRect(e.x-e.dir*0.35,foot-0.17,0.07,0.07);
+  }else if(e.kind==='boss'){
+    const flame=0.5+0.5*Math.sin(t*7+e.ph);
+    for(const side of [-1,1]){
+      ctx.fillStyle='rgba(238,83,40,'+(0.3+0.35*flame)+')';
+      ctx.fillRect(e.x+side*0.58-0.08,foot-0.64,0.16,0.16+flame*0.18);
+      ctx.fillStyle='#ffd089';
+      ctx.fillRect(e.x+side*0.58-0.035,foot-0.58,0.07,0.09);
+    }
+  }else if(e.air){
+    const thrust=0.15+0.13*Math.sin(t*13+e.ph);
+    for(const side of [-1,1]){
+      ctx.fillStyle='rgba(105,204,255,0.55)';
+      ctx.fillRect(e.x+side*0.35-0.055,foot-lift+0.1,0.11,thrust);
+    }
   }
   // hostile light glow
   const lg = 0.3 + 0.25 * Math.sin(t * 6 + e.ph);
@@ -2201,7 +2231,7 @@ function drawEffect(f) {
 function drawLabels(t) {
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   const fs = Math.max(10, Math.min(16, cam.s * 0.9));
-  ctx.font = '700 ' + fs + 'px "Pixelify Sans", monospace';
+  ctx.font = '700 ' + fs + 'px "Inter", Arial, sans-serif';
   CPS.forEach((c, i) => {
     const [x, y] = toScreen(c[0] + 1, c[1] + 0.65);
     ctx.fillStyle = '#ffd27a'; ctx.fillText(String(i + 1), x, y + 1);
@@ -2213,19 +2243,19 @@ function drawLabels(t) {
     const a = 1 - tx.t / tx.dur;
     if (tx.screen) {
       const r = viewRect();
-      ctx.font = '700 18px "Pixelify Sans", monospace';
+      ctx.font = '700 18px "Inter", Arial, sans-serif';
       ctx.fillStyle = 'rgba(242,169,59,' + a + ')';
       ctx.fillText(tx.txt, vw / 2, r.top + 40 - tx.t * 8);
     } else {
       const [x, y] = toScreen(tx.x, tx.y - tx.t * 0.8);
-      ctx.font = '700 ' + Math.max(10, fs * 0.8) + 'px "Pixelify Sans", monospace';
+      ctx.font = '700 ' + Math.max(10, fs * 0.8) + 'px "Inter", Arial, sans-serif';
       ctx.fillStyle = 'rgba(255,226,120,' + a + ')';
       ctx.fillText(tx.txt, x, y);
     }
   }
   if (S.phase === 'countdown') {
     const r = viewRect();
-    ctx.font = '700 22px "Pixelify Sans", monospace';
+    ctx.font = '700 22px "Inter", Arial, sans-serif';
     ctx.fillStyle = '#f2a93b';
     ctx.fillText('Wave ' + S.wave + ' in ' + Math.ceil(S.countdown), vw / 2, r.top + r.h / 2);
   }
@@ -2270,7 +2300,7 @@ function oddsTable() {
   const cur = ODDS[S.odds], nxt = ODDS[Math.min(S.odds + 1, ODDS.length - 1)];
   const max = S.odds >= ODDS.length - 1;
   let h = '<table class="odds"><thead><tr><th>Starts as</th><th>Now (level ' + S.odds + ')</th>' + (max ? '' : '<th>Next level</th>') + '</tr></thead><tbody>';
-  ['Ore', 'Ingot', 'Rod / Wire', 'Bolt / Coil'].forEach((nm, i) => {
+  ['1★ Ore', '2★ Ingot', '3★ Rod / Wire', '4★ Bolt / Coil', '5★ Core', '6★ Mech'].forEach((nm, i) => {
     h += '<tr><td>' + nm + '</td><td>' + cur[i] + '%</td>' + (max ? '' : '<td class="' + (nxt[i] > cur[i] ? 'up' : '') + '">' + nxt[i] + '%</td>') + '</tr>';
   });
   return h + '</tbody></table>';
@@ -2280,7 +2310,7 @@ function renderPanel() {
   const sel = S.sel ? pieces.get(S.sel) : null;
   if (S.showOdds) {
     const max = S.odds >= ODDS.length - 1, cost = oddsCost(S.odds);
-    h += '<div class="hint">Higher Metal Chance gives newly placed metals a better chance to start at a higher tier.</div>' + oddsTable();
+    h += '<div class="hint">Higher Metal Chance unlocks 5★ Core drops at level 9 and rare 6★ Mechs at level 11. Upgrade to improve their chances.</div>' + oddsTable();
     h += '<div class="row">' + (max ? '<button type="button" disabled>Metal Chance at maximum</button>' :
       '<button type="button" class="primary" data-act="buy"' + (S.gold < cost ? ' disabled' : '') + '>Upgrade for ' + cost + ' gold</button>') +
       '<button type="button" data-act="closeOdds">Close</button></div>';
@@ -2427,6 +2457,6 @@ async function krogothCheckUpdate(){
 }
 document.getElementById('versionTag').addEventListener('click',krogothCheckUpdate);
 if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=18',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
+  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=19',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
 }
 </script>
