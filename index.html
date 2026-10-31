@@ -197,7 +197,7 @@ button.warn { border-color: var(--red); color: var(--red); }
 <div id="app">
   <canvas id="cv" aria-label="Krogoth game field"></canvas>
   <header id="hud">
-    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.21.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
+    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.22.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
     <div class="stat"><span class="lbl">Wave</span><b id="hWave">1</b></div>
     <div class="stat lives"><span class="lbl">Lives</span><b id="hLives">20</b></div>
     <div class="stat gold"><span class="lbl">Gold</span><b id="hGold">10</b></div>
@@ -905,9 +905,15 @@ function sprScuttler(f) {
   P.set(6, 4, E[1]); P.set(6, 3, E[1]); P.set(6, 2, L);
   for (let x = 5; x <= 9; x++) P.set(x, 7, E[1]);
   P.set(7, 7, L);
-  const legs = f ? [[[4, 10], [3, 11], [2, 12], [2, 13]], [[7, 10], [7, 11], [8, 12], [8, 13]], [[9, 10], [9, 11], [10, 12], [10, 13]], [[11, 10], [12, 11], [13, 12], [13, 13]]]
+  const legs = (f % 2) ? [[[4, 10], [3, 11], [2, 12], [2, 13]], [[7, 10], [7, 11], [8, 12], [8, 13]], [[9, 10], [9, 11], [10, 12], [10, 13]], [[11, 10], [12, 11], [13, 12], [13, 13]]]
                  : [[[4, 10], [4, 11], [5, 12], [5, 13]], [[7, 10], [6, 11], [5, 12], [5, 13]], [[9, 10], [10, 11], [11, 12], [11, 13]], [[11, 10], [11, 11], [11, 12], [12, 13]]];
   for (const leg of legs) leg.forEach(([x, y], k) => P.set(x, y, k === 3 ? E[0] : E[1]));
+  // Four-frame scuttler cycle: alternating piston strokes and armoured tail vents.
+  const phase=f%4;
+  P.set(4+phase,4,E[3]);P.set(5+phase,4,E[2]);
+  P.set(3,8,phase<2?L:E[1]);P.set(4,8,E[0]);
+  P.set(10,5,E[3]);P.set(11,5,phase===1||phase===3?L:E[2]);
+  P.set(6,6,E[3]);P.set(9,8,E[0]);
   return P.done();
 }
 function sprRunner(f) {
@@ -917,12 +923,19 @@ function sprRunner(f) {
     const r = Math.hypot(x - 7.5, y - 10.5);
     if (r <= 3.8) P.set(x, y, r > 2.8 ? '#1c1e22' : (r > 1.2 ? '#3b3f46' : '#6d737c'));
   }
-  const spokes = f ? [[7, 9], [8, 12], [5, 11], [10, 10]] : [[6, 9], [9, 12], [5, 10], [10, 11]];
+  const spokes = (f % 2) ? [[7, 9], [8, 12], [5, 11], [10, 10]] : [[6, 9], [9, 12], [5, 10], [10, 11]];
   for (const [x, y] of spokes) P.set(x, y, '#8d949d');
   for (let y = 3; y <= 6; y++) for (let x = 4 + (6 - y); x <= 12; x++) P.set(x, y, y === 3 ? E[3] : (y === 6 ? E[1] : E[2]));
   P.set(12, 4, L); P.set(11, 4, L);
-  P.set(3, 6, E[1]); P.set(2, 6, f ? '#ffcf6a' : '#ff8a3a');
+  P.set(3, 6, E[1]); P.set(2, 6, (f%4===1||f%4===2) ? '#ffcf6a' : '#ff8a3a');
   P.set(8, 7, E[1]); P.set(8, 8, E[1]);
+  // Four rotation phases of the single drive wheel, animated exhaust and front cowling.
+  const phase=f%4;
+  for(const [xx,yy] of [[[7,8],[10,10]],[[9,9],[8,13]],[[6,11],[9,12]],[[6,9],[10,12]]][phase]) P.set(xx,yy,'#e1c085');
+  P.set(4,4,E[3]);P.set(5,3,E[2]);P.set(6,2,phase===0?L:E[3]);
+  P.set(13,5,L);P.set(13,6,E[1]);
+  P.set(1,6,phase===1||phase===2?'#ffdc88':'#8b4b27');
+  P.set(3,8,E[0]);P.set(4,8,E[1]);
   return P.done();
 }
 function sprHornet(f) {
@@ -933,15 +946,22 @@ function sprHornet(f) {
   for (const [x, y] of [[4, 6], [3, 5], [11, 6], [12, 5], [4, 10], [3, 11], [11, 10], [12, 11]]) P.set(x, y, E[1]);
   const rc = '#aeb6bf';
   for (const [cx, cy] of [[3, 4], [12, 4], [3, 12], [12, 12]]) {
-    if (f) { for (let dx = -2; dx <= 2; dx++) P.set(cx + dx, cy, rc); }
-    else { P.set(cx - 1, cy, rc); P.set(cx, cy, '#6d747d'); P.set(cx + 1, cy, rc); }
+    if(f%4===0){for(let dx=-2;dx<=2;dx++)P.set(cx+dx,cy,rc);}
+    else if(f%4===1){for(let d=-1;d<=1;d++)P.set(cx+d,cy+d,rc);}
+    else if(f%4===2){for(let dy=-2;dy<=2;dy++)P.set(cx,cy+dy,rc);}
+    else {for(let d=-1;d<=1;d++)P.set(cx+d,cy-d,rc);}
+    P.set(cx,cy,'#647888');
   }
+  // Bright cockpit and phase-shifted stabiliser lights.
+  P.set(7,7,L);P.set(8,7,L);
+  P.set(5,9,E[3]);P.set(10,9,E[3]);
+  P.set(7,5,f%2?E[3]:L);P.set(8,5,f%2?L:E[3]);
   return P.done();
 }
 function sprWarlord(f) {
   // heavy bipedal assault mech
   const E = EPAL.boss, L = ELIGHT.boss, P = painter(16, 16);
-  const s = f ? 1 : 0;
+  const s = (f%2) ? 1 : 0;
   const legs = [[4 + s, 11], [4 + s, 12], [4 + s, 13], [10 - s, 11], [10 - s, 12], [10 - s, 13]];
   for (const [x, y] of legs) { P.set(x, y, E[1]); P.set(x + 1, y, E[2]); }
   for (let x = 3 + s; x <= 6 + s; x++) P.set(x, 14, E[0]);
@@ -953,6 +973,15 @@ function sprWarlord(f) {
   P.set(7, 6, L); P.set(8, 6, L); P.set(7, 7, '#ff8a60'); P.set(8, 7, '#ff8a60');
   for (let y = 3; y <= 6; y++) { P.set(1, y, E[1]); P.set(2, y, E[2]); P.set(13, y, E[2]); P.set(14, y, E[1]); }
   for (let y = 1; y <= 2; y++) { P.set(1, y, '#24272c'); P.set(14, y, '#24272c'); }
+  // Four-frame hydraulic stomp with shoulder vents and a flashing command visor.
+  const phase=f%4;
+  P.set(4,3,E[0]);P.set(11,3,E[0]);
+  P.set(2,4,phase<2?L:E[3]);P.set(13,4,phase>=2?L:E[3]);
+  P.set(6,2,E[3]);P.set(9,2,E[3]);
+  P.set(7,2,phase===0||phase===2?'#ffd0a0':L);
+  P.set(8,2,phase===1||phase===3?'#ffd0a0':L);
+  P.set(5+phase%2,11,E[3]);P.set(10-phase%2,11,E[3]);
+  P.set(6,8,E[0]);P.set(9,8,E[0]);
   return P.done();
 }
 function whiten(spr) {
@@ -970,10 +999,10 @@ function buildSprites() {
   SPRITES.scrap = [sprScrap(0), sprScrap(1), sprScrap(2)];
   SPRITES.plinth = sprPlinth();
   SPRITES.enemy = {
-    ground: [sprScuttler(0), sprScuttler(1)],
-    fast: [sprRunner(0), sprRunner(1)],
-    air: [sprHornet(0), sprHornet(1)],
-    boss: [sprWarlord(0), sprWarlord(1)],
+    ground: [0,1,2,3].map(sprScuttler),
+    fast: [0,1,2,3].map(sprRunner),
+    air: [0,1,2,3].map(sprHornet),
+    boss: [0,1,2,3].map(sprWarlord),
   };
   SPRITES.enemyW = {};
   for (const k in SPRITES.enemy) SPRITES.enemyW[k] = SPRITES.enemy[k].map(whiten);
@@ -2080,7 +2109,7 @@ function drawPiece(p, t) {
 }
 
 function drawEnemy(e, t) {
-  const fr = Math.abs(Math.floor((e.air ? t * 12 : e.prog * (e.kind === 'fast' ? 4 : 2.6)) + e.ph)) % 2;
+  const fr = Math.abs(Math.floor((e.air ? t * 13 : e.prog * (e.kind === 'fast' ? 9 : e.kind === 'boss' ? 3.8 : 6.5)) + e.ph)) % 4;
   const spr = (e.flash > 0 ? SPRITES.enemyW : SPRITES.enemy)[e.kind][fr];
   const img = spr.c || spr;
   const size = e.kind === 'boss' ? 2.2 : (e.air ? 1.35 : (e.kind === 'fast' ? 1.25 : 1.3));
@@ -2539,6 +2568,6 @@ async function krogothCheckUpdate(){
 }
 document.getElementById('versionTag').addEventListener('click',krogothCheckUpdate);
 if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=21',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
+  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=22',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
 }
 </script>
