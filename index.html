@@ -67,6 +67,9 @@ button.primary { background: var(--amber); color: var(--amber-ink); border-color
 button.warn { border-color: var(--red); color: var(--red); }
 .chip { font-family: var(--font-display); font-size: 15px; }
 
+.veteran-track {height:7px;background:#111b24;border:1px solid #4a6271;border-radius:6px;overflow:hidden;margin-top:8px;max-width:340px}
+.veteran-fill {height:100%;background:linear-gradient(90deg,#d09b39,#ffe18a);box-shadow:0 0 8px #f2a93b77;transition:width .2s}
+.veteran-note {font-size:11px;color:#bfcad2;margin-top:4px;letter-spacing:.01em}
 #next {
   position: absolute; z-index: 2; right: max(10px, env(safe-area-inset-right, 0px));
   padding: 3px 8px; border-radius: 3px; font-size: 12px; letter-spacing: .06em;
@@ -194,7 +197,7 @@ button.warn { border-color: var(--red); color: var(--red); }
 <div id="app">
   <canvas id="cv" aria-label="Krogoth game field"></canvas>
   <header id="hud">
-    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.20.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
+    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.21.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
     <div class="stat"><span class="lbl">Wave</span><b id="hWave">1</b></div>
     <div class="stat lives"><span class="lbl">Lives</span><b id="hLives">20</b></div>
     <div class="stat gold"><span class="lbl">Gold</span><b id="hGold">10</b></div>
@@ -2203,6 +2206,19 @@ function drawEnemy(e, t) {
     ctx.fillRect(e.x-0.16,top+0.22,0.32,0.1);
   }
   ctx.restore();
+  // Physical contact markers remain directly on the navigation line; animated
+  // feet and hovering bodies are cosmetic and never displace the route anchor.
+  if(!e.air && e.frozen<=0){
+    const stride=Math.sin(gaitPhase);
+    const sx=e.x+(e.dir<0?-1:1)*0.18;
+    ctx.fillStyle=e.kind==='boss'?'rgba(255,114,76,0.22)':e.kind==='fast'?'rgba(255,187,94,0.23)':'rgba(132,205,105,0.18)';
+    ctx.fillRect(sx-0.15,foot-0.025,0.3,0.045);
+    if(Math.abs(stride)>0.7){
+      ctx.fillStyle='rgba(188,197,202,0.28)';
+      ctx.fillRect(e.x-0.19,foot-0.045,0.12,0.035);
+      ctx.fillRect(e.x+0.07,foot-0.045,0.12,0.035);
+    }
+  }
   // hostile light glow
   const lg = 0.3 + 0.25 * Math.sin(t * 6 + e.ph);
   ctx.fillStyle = hexA(ELIGHT[e.kind], lg * 0.5); ellipse(e.x + (e.dir < 0 ? -1 : 1) * size * 0.25, top + size * 0.45, size * 0.18, size * 0.12);
@@ -2333,12 +2349,22 @@ function pieceCard(p) {
   }
   const st = stats(p);
   const pips = p.tier === 6 ? 'MECH' : '●'.repeat(p.tier);
-  const boost = (p.aura > 1.001 ? '<span>Gold boost <b>+' + Math.round((p.aura - 1) * 100) + '%</b></span>' : '') +
-    '<span>Kills <b>' + (p.kills || 0) + '</b>' + (killBoost(p) > 1 ? ' (+' + Math.round((killBoost(p) - 1) * 100) + '%)' : '') + '</span>';
+  const kills = p.kills || 0;
+  const veteranPct = Math.round((killBoost(p) - 1) * 100);
+  const auraPct = Math.round((p.aura - 1) * 100);
+  const nextKills = (Math.floor(kills / 5) + 1) * 5;
+  const killProgress = (kills % 5) * 20;
+  const baseDamage = m.dmg * TIER_MULT[p.tier - 1];
+  const boost = '<span>Kills <b>' + kills + '</b></span>' +
+    '<span>Veteran bonus <b>+' + veteranPct + '%</b></span>' +
+    '<span>Gold aura <b>' + (auraPct ? '+' + auraPct + '%' : 'None') + '</b></span>' +
+    '<span>Base damage <b>' + Math.round(baseDamage) + '</b></span>';
+  const veteranBar = '<div class="veteran-track" role="progressbar" aria-label="Kills towards next damage bonus" aria-valuemin="0" aria-valuemax="5" aria-valuenow="' + (kills % 5) + '"><div class="veteran-fill" style="width:' + killProgress + '%"></div></div>' +
+    '<div class="veteran-note">Next +1% damage at ' + nextKills + ' kills · ' + (nextKills - kills) + ' to go</div>';
   return '<div class="card"><canvas width="16" height="16" data-m="' + p.metal + '" data-t="' + p.tier + '"></canvas>' +
     '<div class="txt"><div class="nm">' + esc(pieceName(p.metal, p.tier)) + '<span class="pips">' + pips + '</span></div>' +
     '<div class="role">' + esc(m.role) + ' · ' + esc(specialText(p)) + '</div>' +
-    '<div class="stats"><span>Damage <b>' + Math.round(st.dmg) + '</b></span><span>Range <b>' + st.rng.toFixed(1) + '</b></span><span>Rate <b>' + (1 / st.cd).toFixed(1) + '/s</b></span>' + boost + '</div></div></div>';
+    '<div class="stats"><span>Damage <b>' + Math.round(st.dmg) + '</b></span><span>Range <b>' + st.rng.toFixed(1) + '</b></span><span>Rate <b>' + (1 / st.cd).toFixed(1) + '/s</b></span>' + boost + '</div>' + veteranBar + '</div></div>';
 }
 function paintCardCanvases() {
   for (const c of panel.querySelectorAll('canvas')) {
@@ -2513,6 +2539,6 @@ async function krogothCheckUpdate(){
 }
 document.getElementById('versionTag').addEventListener('click',krogothCheckUpdate);
 if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=20',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
+  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=21',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
 }
 </script>
