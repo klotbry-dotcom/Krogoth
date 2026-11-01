@@ -197,7 +197,7 @@ button.warn { border-color: var(--red); color: var(--red); }
 <div id="app">
   <canvas id="cv" aria-label="Krogoth game field"></canvas>
   <header id="hud">
-    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.26.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
+    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.27.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
     <div class="stat"><span class="lbl">Wave</span><b id="hWave">1</b></div>
     <div class="stat lives"><span class="lbl">Lives</span><b id="hLives">20</b></div>
     <div class="stat gold"><span class="lbl">Gold</span><b id="hGold">10</b></div>
@@ -506,7 +506,8 @@ function stats(p) {
   let cd = m.cd * (mech ? 0.8 : 1);
   if (mech && m.k === 'uranium') cd = 0.5;
   const level=p.special!=null?(p.upgrade||0):0;
-  return { dmg: m.dmg * TIER_MULT[t - 1] * p.aura * killBoost(p) * (1+level*0.25), rng: m.rng + 0.3 * (t - 1) + (mech ? 1 : 0) + level*0.25, cd:cd/(1+level*0.08) };
+  const god=p.god===true;
+  return { dmg: m.dmg * TIER_MULT[t - 1] * p.aura * killBoost(p) * (1+level*0.25)*(god?3.5:1), rng: m.rng + 0.3 * (t - 1) + (mech ? 1 : 0) + level*0.25+(god?2.5:0), cd:cd/(1+level*0.08)/(god?1.6:1) };
 }
 
 function specialText(p) {
@@ -1294,13 +1295,16 @@ function doCombineFour(p) {
   if(!p || S.phase!=='choose' || !p.isNew || p.kind!=='tower' || p.tier>=6)return;
   const matches=partnersFor(p).slice(0,3);
   if(matches.length!==3)return;
+  const godFusion=p.tier===5;
   const newTier=Math.min(6,p.tier+2);
+  p.god=godFusion;
   p.kills=(p.kills||0)+matches.reduce((sum,q)=>sum+(q.kills||0),0);
   p.tier=newTier;
   for(const q of matches)toScrap(q);
   burst(p.x+1,p.y+1,METALS[p.metal].c[3],42);
   S.effects.push({type:'ring',x:p.x+1,y:p.y+1,r:3.4,col:'#ffe9a0',t:0,dur:0.8});
-  S.texts.push({x:p.x+1,y:p.y-0.8,txt:'4× FUSION → '+newTier+'★',t:0,dur:1.4});
+  S.texts.push({x:p.x+1,y:p.y-0.8,txt:godFusion?'GOD MECH AWAKENED!':'4× FUSION → '+newTier+'★',t:0,dur:godFusion?3:1.4});
+  if(godFusion){S.effects.push({type:'flash',x:p.x+1,y:p.y-0.5,r:4.5,col:'#ffe5a0',t:0,dur:0.8});S.shake=Math.max(S.shake,0.5);}
   enterSpecialPool(p.id);
 }
 function doDispose(p) {
@@ -2016,6 +2020,14 @@ function drawPiece(p, t) {
   }
   const m = METALS[p.metal], tier = p.tier, ph = p.ph, sp = p.sp, mech = tier === 6;
   ctx.drawImage(SPRITES.plinth.c, x, y, 2, 2);
+  if(p.god){
+    const a=0.45+0.25*Math.sin(t*2.8+p.ph);
+    ctx.save();ctx.translate(x+1,y+0.3);ctx.rotate(t*0.38);
+    ctx.strokeStyle='rgba(255,225,148,'+a+')';ctx.lineWidth=0.085;
+    ctx.beginPath();ctx.ellipse(0,0,1.65,0.55,0,0,Math.PI*2);ctx.stroke();
+    for(let j=0;j<8;j++){const th=j*Math.PI/4;ctx.fillStyle=j%2?'#ffffff':'#ffcc67';ctx.fillRect(Math.cos(th)*1.65-0.08,Math.sin(th)*0.55-0.08,0.16,0.16);}
+    ctx.restore();
+  }
   let spr, bob = 0;
   if (mech) spr = SPRITES.piece[p.metal][5][Math.floor(t * 1.6 * sp + ph) % 2];
   else {
@@ -2502,7 +2514,7 @@ function pieceCard(p) {
   }
   const st = stats(p);
   const special=p.special!=null?RECIPES[p.special]:null;
-  const pips = p.tier === 6 ? 'MECH' : '●'.repeat(p.tier);
+  const pips = p.god ? '✦ GOD MECH ✦' : (p.tier === 6 ? 'MECH' : '●'.repeat(p.tier));
   const kills = p.kills || 0;
   const veteranPct = Math.round((killBoost(p) - 1) * 100);
   const auraPct = Math.round((p.aura - 1) * 100);
@@ -2516,8 +2528,8 @@ function pieceCard(p) {
   const veteranBar = '<div class="veteran-track" role="progressbar" aria-label="Kills towards next damage bonus" aria-valuemin="0" aria-valuemax="5" aria-valuenow="' + (kills % 5) + '"><div class="veteran-fill" style="width:' + killProgress + '%"></div></div>' +
     '<div class="veteran-note">Next +1% damage at ' + nextKills + ' kills · ' + (nextKills - kills) + ' to go</div>';
   return '<div class="card"><canvas width="16" height="16" data-m="' + p.metal + '" data-t="' + p.tier + '"></canvas>' +
-    '<div class="txt"><div class="nm">' + esc(special?special.name:pieceName(p.metal, p.tier)) + '<span class="pips">' + pips + '</span></div>' +
-    '<div class="role">' + esc(special?special.role:m.role + ' · ' + specialText(p)) + (special?' · Upgrade '+(p.upgrade||0)+'/5':'') + '</div>' +
+    '<div class="txt"><div class="nm">' + esc(p.god?'GOD '+m.name+' MECH':special?special.name:pieceName(p.metal, p.tier)) + '<span class="pips">' + pips + '</span></div>' +
+    '<div class="role">' + esc(p.god?'Divine fusion · 3.5× damage, +2.5 range, 60% faster attacks · '+specialText(p):special?special.role:m.role + ' · ' + specialText(p)) + (special?' · Upgrade '+(p.upgrade||0)+'/5':'') + '</div>' +
     '<div class="stats"><span>Damage <b>' + Math.round(st.dmg) + '</b></span><span>Range <b>' + st.rng.toFixed(1) + '</b></span><span>Rate <b>' + (1 / st.cd).toFixed(1) + '/s</b></span>' + boost + '</div>' + veteranBar + '</div></div>';
 }
 function paintCardCanvases() {
@@ -2578,7 +2590,7 @@ function renderPanel() {
       h += pieceCard(sel) + '<div class="row">';
       if (S.phase==='choose' && sel.isNew) h += '<button type="button" class="primary" data-act="keep">Keep this</button>';
       if (partners.length && sel.tier < 6) h += '<button type="button" class="primary" data-act="combine" data-q="' + partners[0].id + '">Combine 2 → ' + esc(pieceName(sel.metal, sel.tier + 1)) + '</button>';
-      if (partners.length>=3 && sel.tier<6) h += '<button type="button" class="primary" data-act="combineFour">Combine 4 → ' + esc(pieceName(sel.metal, Math.min(6,sel.tier+2))) + '</button>';
+      if (partners.length>=3 && sel.tier<6) h += '<button type="button" class="primary" data-act="combineFour">Combine 4 → ' + esc(sel.tier===5?'GOD '+METALS[sel.metal].name+' MECH':pieceName(sel.metal, Math.min(6,sel.tier+2))) + '</button>';
       h += '<button type="button" data-act="deselect">Back</button></div>';
       for(const opt of recipeOptions) h += '<div class="hint"><b>'+esc(opt.r.name)+'</b> · '+esc(opt.r.role)+'</div><div class="row"><button type="button" class="primary" data-act="forge" data-recipe="'+opt.i+'">Forge 3-metal special</button></div>';
       if(sel.special!=null)h+='<div class="row"><button type="button" class="primary" data-act="upgradeSpecial"'+((sel.upgrade||0)>=5||S.gold<specialCost(sel)?' disabled':'')+'>' + ((sel.upgrade||0)>=5?'Fully upgraded':'Upgrade special · '+specialCost(sel)+' gold')+'</button></div>';
@@ -2688,7 +2700,7 @@ window.__krogoth = {
 
 <script>
 /* Keep installed and browser versions in sync; the badge can force a fresh check. */
-const KROGOTH_VERSION='0.26.0';
+const KROGOTH_VERSION='0.27.0';
 async function krogothCheckUpdate(){
   const tag=document.getElementById('versionTag');
   if(tag){tag.querySelector('.ver-number').textContent='Checking…';tag.disabled=true;}
@@ -2708,6 +2720,6 @@ async function krogothCheckUpdate(){
 }
 document.getElementById('versionTag').addEventListener('click',krogothCheckUpdate);
 if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=26',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
+  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=27',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
 }
 </script>
