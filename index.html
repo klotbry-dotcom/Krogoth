@@ -197,7 +197,7 @@ button.warn { border-color: var(--red); color: var(--red); }
 <div id="app">
   <canvas id="cv" aria-label="Krogoth game field"></canvas>
   <header id="hud">
-    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.29.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
+    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.30.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
     <div class="stat"><span class="lbl">Wave</span><b id="hWave">1</b></div>
     <div class="stat lives"><span class="lbl">Lives</span><b id="hLives">20</b></div>
     <div class="stat gold"><span class="lbl">Gold</span><b id="hGold">10</b></div>
@@ -2585,10 +2585,36 @@ function oddsTable() {
   });
   return h + '</tbody></table>';
 }
+function recipeGuideHTML(){
+  const owned=[...pieces.values()].filter(p=>p.kind==='tower'&&p.special==null&&!p.god&&(!p.isNew||S.phase==='forge'));
+  const available=new Map();
+  for(const p of owned){const k=p.metal+':'+p.tier;available.set(k,(available.get(k)||0)+1);}
+  const candidates=RECIPES.map((r,i)=>{
+    const needed=r.metals.map((m,j)=>({m,t:r.tiers[j],key:m+':'+r.tiers[j]}));
+    const have=new Map(available);
+    let matched=0;
+    const ingredients=needed.map(n=>{
+      const ok=(have.get(n.key)||0)>0;
+      if(ok){matched++;have.set(n.key,have.get(n.key)-1);}
+      return '<span style="color:'+(ok?'#a9e8b0':'#f0b3a1')+'">'+(ok?'✓ ':'○ ')+esc(METALS[n.m].name)+' '+n.t+'★</span>';
+    });
+    return {r,i,matched,ingredients,score:matched*100+recipePower(r).total};
+  }).sort((a,b)=>b.score-a.score);
+  let h='<div class="hint"><b>Recipe Guide</b> · Collect towers across rounds. Keep ONE of five (or fuse matching towers), then use your permanent pool to forge a 3-metal Mech. Green ✓ = owned; red ○ = missing. Higher star totals make stronger Mechs.</div>';
+  h+='<div class="hint">Best matches first · '+candidates.filter(c=>c.matched===3).length+' ready to forge · '+RECIPES.length+' recipes</div>';
+  h+='<div style="max-height:220px;overflow-y:auto;display:grid;gap:7px;padding:4px 0">';
+  for(const c of candidates){
+    const p=recipePower(c.r);
+    h+='<div style="border:1px solid #515b67;border-radius:5px;padding:7px"><b>'+esc(c.r.name)+'</b> · '+p.rank+' · '+c.matched+'/3 owned<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:4px;font-size:12px">'+c.ingredients.join('')+'</div></div>';
+  }
+  return h+'</div><div class="row"><button type="button" data-act="closeRecipes">Close recipe guide</button></div>';
+}
 function renderPanel() {
   let h = '';
   const sel = S.sel ? pieces.get(S.sel) : null;
-  if (S.showOdds) {
+  if (S.showRecipes) {
+    h+=recipeGuideHTML();
+  } else if (S.showOdds) {
     const max = S.odds >= ODDS.length - 1, cost = oddsCost(S.odds);
     h += '<div class="hint">Metal Chance upgrades reach a maximum 20% chance of a 5★ Core at level 10. Combine matching 5★ Cores to create 6★ Mechs.</div>' + oddsTable();
     h += '<div class="row">' + (max ? '<button type="button" disabled>Metal Chance at maximum</button>' :
@@ -2630,7 +2656,7 @@ function renderPanel() {
     } else {
       const anyCombo = S.newIds.some((id) => { const p = pieces.get(id); return p && partnersFor(p).length; });
       h += '<div class="hint">Choose ONE of your five towers, combine TWO matching towers (+1 tier), or combine FOUR matching towers (+2 tiers). All other new towers become scrap. Your survivor then joins the existing towers for special recipes.</div>';
-      if(S.phase==='forge')h+='<div class="hint">Your chosen tower has joined the special pool.</div>';
+      if(S.phase==='forge')h+='<div class="hint">Your chosen tower has joined the special pool. Open Recipe Guide to see what you can forge or which ingredients to save.</div>';
       h += '<div class="hint">Pick one new piece to keep. The other four become scrap. ' + (anyCombo ? '<span class="dim">You have a match, so you can combine.</span>' : '') + '</div>';
     }
     if(S.phase==='forge'){
@@ -2646,6 +2672,7 @@ function renderPanel() {
     } else if (S.phase === 'countdown') h += '<div class="hint">Get ready.</div>';
     else h += '<div class="hint">Wave ' + S.wave + ' (' + KIND_LABEL[waveInfo(S.wave).kind] + '). <span class="dim" id="leftCount">' + left + ' left.</span></div>';
   }
+  if(!S.showRecipes && !S.showOdds && S.phase!=='over')h+='<div class="row"><button type="button" data-act="openRecipes">📖 Recipe Guide · '+RECIPES.length+' Mechs</button></div>';
   panel.innerHTML = h;
   document.documentElement.style.setProperty('--panel-height',panel.offsetHeight+'px');
   paintCardCanvases();
@@ -2657,6 +2684,8 @@ panel.addEventListener('click', (e) => {
   if (!b) return;
   const sel = S.sel ? pieces.get(S.sel) : null;
   switch (b.dataset.act) {
+    case 'openRecipes': S.showRecipes=true;renderPanel();break;
+    case 'closeRecipes': S.showRecipes=false;renderPanel();break;
     case 'place': doPlace(); break;
     case 'cancel': S.ghost = null; renderPanel(); break;
     case 'deselect': S.sel = null; renderPanel(); break;
@@ -2732,7 +2761,7 @@ window.__krogoth = {
 
 <script>
 /* Keep installed and browser versions in sync; the badge can force a fresh check. */
-const KROGOTH_VERSION='0.29.0';
+const KROGOTH_VERSION='0.30.0';
 async function krogothCheckUpdate(){
   const tag=document.getElementById('versionTag');
   if(tag){tag.querySelector('.ver-number').textContent='Checking…';tag.disabled=true;}
@@ -2752,6 +2781,6 @@ async function krogothCheckUpdate(){
 }
 document.getElementById('versionTag').addEventListener('click',krogothCheckUpdate);
 if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=29',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
+  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=30',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
 }
 </script>
