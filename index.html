@@ -197,7 +197,7 @@ button.warn { border-color: var(--red); color: var(--red); }
 <div id="app">
   <canvas id="cv" aria-label="Krogoth game field"></canvas>
   <header id="hud">
-    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.27.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
+    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.28.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
     <div class="stat"><span class="lbl">Wave</span><b id="hWave">1</b></div>
     <div class="stat lives"><span class="lbl">Lives</span><b id="hLives">20</b></div>
     <div class="stat gold"><span class="lbl">Gold</span><b id="hGold">10</b></div>
@@ -274,21 +274,47 @@ const ODDS = [
   [4,16,25,35,20]
 ];
 // Three-metal forge recipes: one 5-star core and two distinct lower-tier metals.
+// Curated high-tier recipes plus a complete 35-recipe foundation.
+// Every one of the seven metals at each of tiers 1-5 is used as a core ingredient.
 const RECIPES = [
-  {name:'Tempest Engine', metals:[1,2,6], tiers:[5,3,2], role:'Storm-driven anti-air artillery'},
-  {name:'Siege Colossus', metals:[0,4,5], tiers:[5,3,2], role:'Armoured siege and gold support'},
-  {name:'Plague Reactor', metals:[3,1,0], tiers:[5,3,2], role:'Radiation and chain reactions'},
-  {name:'Glacier Sentinel', metals:[2,6,4], tiers:[5,3,2], role:'Cryogenic interception'},
-  {name:'Solar Sovereign', metals:[5,3,1], tiers:[5,3,2], role:'Economic power and energy'},
-  {name:'Skybreaker', metals:[6,4,2], tiers:[5,3,2], role:'Precision aerial suppression'},
-  {name:'Iron Tempest', metals:[4,0,3], tiers:[5,3,2], role:'Piercing siege and fallout'},
+  {name:'Tempest Engine', metals:[1,2,6], tiers:[5,4,1], role:'Storm-driven anti-air artillery'},
+  {name:'Siege Colossus', metals:[0,4,5], tiers:[5,5,3], role:'Armoured siege and gold support'},
+  {name:'Plague Reactor', metals:[3,1,0], tiers:[5,2,4], role:'Radiation and chain reactions'},
+  {name:'Glacier Sentinel', metals:[2,6,4], tiers:[5,1,5], role:'Cryogenic interception'},
+  {name:'Solar Sovereign', metals:[5,3,1], tiers:[5,4,4], role:'Economic power and energy'},
+  {name:'Skybreaker', metals:[6,4,2], tiers:[5,5,2], role:'Precision aerial suppression'},
+  {name:'Iron Tempest', metals:[4,0,3], tiers:[5,3,5], role:'Piercing siege and fallout'},
 ];
+const FORGE_PREFIX=['Scout','Vanguard','Sentinel','Warforged','Ascendant'];
+const FORGE_SUFFIX=['Bulwark','Conductor','Cryowarden','Blightbringer','Lancer','Treasurer','Interceptor'];
+for(let tier=1;tier<=5;tier++)for(let metal=0;metal<METALS.length;metal++){
+  const second=(metal+tier)%METALS.length;
+  const third=(metal+tier+2)%METALS.length;
+  const m2=second===metal?(second+1)%METALS.length:second;
+  let m3=third;
+  while(m3===metal||m3===m2)m3=(m3+1)%METALS.length;
+  RECIPES.push({
+    name:FORGE_PREFIX[tier-1]+' '+FORGE_SUFFIX[metal],
+    metals:[metal,m2,m3],
+    tiers:[tier,Math.max(1,tier-1),Math.min(5,tier+1)],
+    role:METALS[metal].role+' / '+METALS[m2].name+' / '+METALS[m3].name
+  });
+}
+function recipePower(recipe){
+  const total=recipe.tiers.reduce((a,b)=>a+b,0);
+  return {total,rank:total>=13?'LEGENDARY':total>=10?'EPIC':total>=7?'RARE':'STANDARD',
+    factor:0.28+total*0.085};
+}
 function recipeMatch(recipe, base, newOnly=false) {
-  if(!base||base.kind!=='tower'||base.special!=null||base.metal!==recipe.metals[0]||base.tier!==5)return null;
-  const used=[base], candidates=[...pieces.values()].filter(p=>p.kind==='tower'&&p.special==null&&p!==base&&(!newOnly||p.isNew));
-  for(let i=1;i<3;i++){
+  if(!base||base.kind!=='tower'||base.special!=null||base.god)return null;
+  const slot=recipe.metals.findIndex((m,i)=>m===base.metal&&recipe.tiers[i]===base.tier);
+  if(slot<0)return null;
+  const used=new Array(3);used[slot]=base;
+  const candidates=[...pieces.values()].filter(p=>p.kind==='tower'&&p.special==null&&!p.god&&p!==base&&(!newOnly||p.isNew));
+  for(let i=0;i<3;i++){
+    if(i===slot)continue;
     const q=candidates.find(p=>!used.includes(p)&&p.metal===recipe.metals[i]&&p.tier===recipe.tiers[i]);
-    if(!q)return null;used.push(q);
+    if(!q)return null;used[i]=q;
   }
   return used;
 }
@@ -302,7 +328,7 @@ function forgeRecipe(base,index,newOnly=false){
   if(S.phase==='forge'&&!parts.some(p=>p.id===S.chosen))return;
   base.kills=parts.reduce((n,p)=>n+(p.kills||0),0);
   base.tier=6;base.special=index;base.upgrade=0;base.isNew=false;
-  for(const p of parts.slice(1))toScrap(p);
+  for(const p of parts)if(p!==base)toScrap(p);
   burst(base.x+1,base.y+1,METALS[base.metal].c[3],35);
   S.effects.push({type:'ring',x:base.x+1,y:base.y+1,r:3,col:'#ffe09a',t:0,dur:0.8});
   S.sel=base.id;
@@ -507,7 +533,9 @@ function stats(p) {
   if (mech && m.k === 'uranium') cd = 0.5;
   const level=p.special!=null?(p.upgrade||0):0;
   const god=p.god===true;
-  return { dmg: m.dmg * TIER_MULT[t - 1] * p.aura * killBoost(p) * (1+level*0.25)*(god?3.5:1), rng: m.rng + 0.3 * (t - 1) + (mech ? 1 : 0) + level*0.25+(god?2.5:0), cd:cd/(1+level*0.08)/(god?1.6:1) };
+  const forge=p.special!=null?recipePower(RECIPES[p.special]):null;
+  const power=forge?forge.factor:1;
+  return { dmg: m.dmg * TIER_MULT[t - 1] * p.aura * killBoost(p) * (1+level*0.25)*(god?3.5:1)*power, rng: m.rng + 0.3 * (t - 1) + (mech ? 1 : 0) + level*0.25+(god?2.5:0)+(forge?Math.max(-1,(forge.total-9)*0.18):0), cd:cd/(1+level*0.08)/(god?1.6:1)/(forge?0.75+forge.total*0.025:1) };
 }
 
 function specialText(p) {
@@ -2514,7 +2542,7 @@ function pieceCard(p) {
   }
   const st = stats(p);
   const special=p.special!=null?RECIPES[p.special]:null;
-  const pips = p.god ? '✦ GOD MECH ✦' : (p.tier === 6 ? 'MECH' : '●'.repeat(p.tier));
+  const pips = p.god ? '✦ GOD MECH ✦' : (special?recipePower(special).rank+' MECH':p.tier === 6 ? 'MECH' : '●'.repeat(p.tier));
   const kills = p.kills || 0;
   const veteranPct = Math.round((killBoost(p) - 1) * 100);
   const auraPct = Math.round((p.aura - 1) * 100);
@@ -2529,7 +2557,7 @@ function pieceCard(p) {
     '<div class="veteran-note">Next +1% damage at ' + nextKills + ' kills · ' + (nextKills - kills) + ' to go</div>';
   return '<div class="card"><canvas width="16" height="16" data-m="' + p.metal + '" data-t="' + p.tier + '"></canvas>' +
     '<div class="txt"><div class="nm">' + esc(p.god?'GOD '+m.name+' MECH':special?special.name:pieceName(p.metal, p.tier)) + '<span class="pips">' + pips + '</span></div>' +
-    '<div class="role">' + esc(p.god?'Divine fusion · 3.5× damage, +2.5 range, 60% faster attacks · '+specialText(p):special?special.role:m.role + ' · ' + specialText(p)) + (special?' · Upgrade '+(p.upgrade||0)+'/5':'') + '</div>' +
+    '<div class="role">' + esc(p.god?'Divine fusion · 3.5× damage, +2.5 range, 60% faster attacks · '+specialText(p):special?special.role+' · '+recipePower(special).rank+' · Power '+recipePower(special).total+'/15':m.role + ' · ' + specialText(p)) + (special?' · Upgrade '+(p.upgrade||0)+'/5':'') + '</div>' +
     '<div class="stats"><span>Damage <b>' + Math.round(st.dmg) + '</b></span><span>Range <b>' + st.rng.toFixed(1) + '</b></span><span>Rate <b>' + (1 / st.cd).toFixed(1) + '/s</b></span>' + boost + '</div>' + veteranBar + '</div></div>';
 }
 function paintCardCanvases() {
@@ -2592,7 +2620,7 @@ function renderPanel() {
       if (partners.length && sel.tier < 6) h += '<button type="button" class="primary" data-act="combine" data-q="' + partners[0].id + '">Combine 2 → ' + esc(pieceName(sel.metal, sel.tier + 1)) + '</button>';
       if (partners.length>=3 && sel.tier<6) h += '<button type="button" class="primary" data-act="combineFour">Combine 4 → ' + esc(sel.tier===5?'GOD '+METALS[sel.metal].name+' MECH':pieceName(sel.metal, Math.min(6,sel.tier+2))) + '</button>';
       h += '<button type="button" data-act="deselect">Back</button></div>';
-      for(const opt of recipeOptions) h += '<div class="hint"><b>'+esc(opt.r.name)+'</b> · '+esc(opt.r.role)+'</div><div class="row"><button type="button" class="primary" data-act="forge" data-recipe="'+opt.i+'">Forge 3-metal special</button></div>';
+      for(const opt of recipeOptions) h += '<div class="hint"><b>'+esc(opt.r.name)+'</b> · '+recipePower(opt.r).rank+' · Power '+recipePower(opt.r).total+'/15 · '+opt.r.metals.map((m,i)=>METALS[m].name+' '+opt.r.tiers[i]+'★').join(' + ')+'</div><div class="row"><button type="button" class="primary" data-act="forge" data-recipe="'+opt.i+'">Forge special Mech</button></div>';
       if(sel.special!=null)h+='<div class="row"><button type="button" class="primary" data-act="upgradeSpecial"'+((sel.upgrade||0)>=5||S.gold<specialCost(sel)?' disabled':'')+'>' + ((sel.upgrade||0)>=5?'Fully upgraded':'Upgrade special · '+specialCost(sel)+' gold')+'</button></div>';
       if (!sel.isNew && !partners.length && S.phase==='choose') h += '<div class="hint dim">Pick one of the new pieces (amber outline).</div>';
     } else {
@@ -2700,7 +2728,7 @@ window.__krogoth = {
 
 <script>
 /* Keep installed and browser versions in sync; the badge can force a fresh check. */
-const KROGOTH_VERSION='0.27.0';
+const KROGOTH_VERSION='0.28.0';
 async function krogothCheckUpdate(){
   const tag=document.getElementById('versionTag');
   if(tag){tag.querySelector('.ver-number').textContent='Checking…';tag.disabled=true;}
@@ -2720,6 +2748,6 @@ async function krogothCheckUpdate(){
 }
 document.getElementById('versionTag').addEventListener('click',krogothCheckUpdate);
 if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=27',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
+  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=28',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
 }
 </script>
