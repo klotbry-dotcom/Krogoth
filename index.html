@@ -197,14 +197,14 @@ button.warn { border-color: var(--red); color: var(--red); }
 #recipeTab{position:absolute;right:100%;top:32%;writing-mode:vertical-rl;transform:rotate(180deg);border-radius:0 8px 8px 0;background:#263a4d;color:#ffe3ac;border:1px solid #63798c;padding:13px 8px;font-weight:800;cursor:pointer;pointer-events:auto;min-height:104px}
 #recipeDrawer.open #recipeTab{background:#735126}
 #recipeDrawerHead{padding:12px;border-bottom:1px solid #536170;display:flex;align-items:center;justify-content:space-between}
-#recipeDrawerBody{padding:10px;overflow-y:auto;overscroll-behavior:contain;flex:1;min-height:0}
+#recipeDrawerBody{padding:10px;overflow-y:auto;overscroll-behavior:contain;flex:1;min-height:0;height:100%;-webkit-overflow-scrolling:touch}
 #recipeDrawerBody .hint{margin-bottom:9px}
 </style>
 
 <div id="app">
   <canvas id="cv" aria-label="Krogoth game field"></canvas>
   <header id="hud">
-    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.34.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
+    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.35.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
     <div class="stat"><span class="lbl">Wave</span><b id="hWave">1</b></div>
     <div class="stat lives"><span class="lbl">Lives</span><b id="hLives">20</b></div>
     <div class="stat gold"><span class="lbl">Gold</span><b id="hGold">10</b></div>
@@ -308,6 +308,25 @@ for(let tier=1;tier<=5;tier++)for(let metal=0;metal<METALS.length;metal++){
     role:METALS[metal].role+' / '+METALS[m2].name+' / '+METALS[m3].name
   });
 }
+// Keep every recipe requiring a 5-star tower, then retain the smallest
+// useful set of lower-tier recipes so all 35 metal/tier cores remain covered.
+const coreKey=(recipe,i)=>recipe.metals[i]+':'+recipe.tiers[i];
+const essential=RECIPES.filter(r=>r.tiers.includes(5));
+const covered=new Set(essential.flatMap(r=>r.metals.map((_,i)=>coreKey(r,i))));
+const optional=RECIPES.filter(r=>!r.tiers.includes(5));
+while(covered.size<METALS.length*5){
+  let best=null,score=0;
+  for(const recipe of optional){
+    const gain=recipe.metals.reduce((n,_,i)=>n+(!covered.has(coreKey(recipe,i))?1:0),0);
+    if(gain>score){best=recipe;score=gain;}
+  }
+  if(!best)throw Error('Recipe coverage incomplete');
+  essential.push(best);
+  best.metals.forEach((_,i)=>covered.add(coreKey(best,i)));
+  optional.splice(optional.indexOf(best),1);
+}
+RECIPES.length=0;
+RECIPES.push(...essential);
 // Invariant: every recipe may use at most one 5-star ingredient.
 for(const recipe of RECIPES){
   if(recipe.tiers.filter(t=>t===5).length>1)throw Error('Unbalanced recipe: '+recipe.name);
@@ -2607,9 +2626,9 @@ function recipeGuideHTML(){
     });
     return {r,i,matched,ingredients,score:matched*100+recipePower(r).total};
   }).sort((a,b)=>b.score-a.score);
-  let h='<div class="hint"><b>Recipe Guide</b> · Collect towers across rounds. Keep ONE of five (or fuse matching towers), then use your permanent pool to forge a 3-metal Mech. Green ✓ = owned; red ○ = missing. Higher star totals make stronger Mechs.</div>';
-  h+='<div class="hint">Best matches first · '+candidates.filter(c=>c.matched===3).length+' ready to forge · '+RECIPES.length+' recipes. To forge, tap the tower whose location you want to keep.</div>';
-  h+='<div style="max-height:220px;overflow-y:auto;display:grid;gap:7px;padding:4px 0">';
+  let h='<div class="hint">✓ Owned · ○ Missing · Stronger ingredients make stronger Mechs. All 5★ recipes retained.</div>';
+  h+='<div class="hint">'+candidates.filter(c=>c.matched===3).length+' ready · '+RECIPES.length+' recipes. To forge, select the tower position you want to keep.</div>';
+  h+='<div style="display:grid;gap:7px;padding:4px 0">';
   for(const c of candidates){
     const p=recipePower(c.r);
     h+='<div style="border:1px solid #515b67;border-radius:5px;padding:7px"><b>'+esc(c.r.name)+'</b> · '+p.rank+' · '+c.matched+'/3 owned<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:4px;font-size:12px">'+c.ingredients.join('')+'</div>' +'</div>';
@@ -2783,7 +2802,7 @@ window.__krogoth = {
 
 <script>
 /* Keep installed and browser versions in sync; the badge can force a fresh check. */
-const KROGOTH_VERSION='0.34.0';
+const KROGOTH_VERSION='0.35.0';
 async function krogothCheckUpdate(){
   const tag=document.getElementById('versionTag');
   if(tag){tag.querySelector('.ver-number').textContent='Checking…';tag.disabled=true;}
@@ -2803,6 +2822,6 @@ async function krogothCheckUpdate(){
 }
 document.getElementById('versionTag').addEventListener('click',krogothCheckUpdate);
 if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=34',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
+  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=35',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
 }
 </script>
