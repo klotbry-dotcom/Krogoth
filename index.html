@@ -192,12 +192,19 @@ button.warn { border-color: var(--red); color: var(--red); }
  #versionTag .ver-mark{width:20px;height:23px;font-size:17px}
  #versionTag .ver-refresh{font-size:15px}
 }
+#recipeDrawer{position:absolute;z-index:80;top:65px;bottom:12px;right:0;width:min(86vw,370px);background:#111b27;border:1px solid #566473;border-right:0;border-radius:12px 0 0 12px;box-shadow:-8px 0 28px #000a;transform:translateX(100%);transition:transform .22s ease;pointer-events:none;display:flex;flex-direction:column}
+#recipeDrawer.open{transform:translateX(0);pointer-events:auto}
+#recipeTab{position:absolute;right:100%;top:32%;writing-mode:vertical-rl;transform:rotate(180deg);border-radius:0 8px 8px 0;background:#263a4d;color:#ffe3ac;border:1px solid #63798c;padding:13px 8px;font-weight:800;cursor:pointer;pointer-events:auto;min-height:104px}
+#recipeDrawer.open #recipeTab{background:#735126}
+#recipeDrawerHead{padding:12px;border-bottom:1px solid #536170;display:flex;align-items:center;justify-content:space-between}
+#recipeDrawerBody{padding:10px;overflow-y:auto;overscroll-behavior:contain;flex:1;min-height:0}
+#recipeDrawerBody .hint{margin-bottom:9px}
 </style>
 
 <div id="app">
   <canvas id="cv" aria-label="Krogoth game field"></canvas>
   <header id="hud">
-    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.33.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
+    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.34.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
     <div class="stat"><span class="lbl">Wave</span><b id="hWave">1</b></div>
     <div class="stat lives"><span class="lbl">Lives</span><b id="hLives">20</b></div>
     <div class="stat gold"><span class="lbl">Gold</span><b id="hGold">10</b></div>
@@ -207,6 +214,7 @@ button.warn { border-color: var(--red); color: var(--red); }
   <div id="next"></div>
   <button id="bOdds" class="odds-fab" type="button" aria-label="Metal Chance" title="Metal Chance"><span class="odds-icon" aria-hidden="true">✦</span><span id="oddsText">METAL CHANCE 0</span></button>
   <section id="panel" aria-live="polite"></section>
+  <aside id="recipeDrawer" aria-label="Special Mech recipe reference"><button id="recipeTab" type="button" aria-expanded="false">⚒ RECIPES</button><div id="recipeDrawerHead"><b>Special Mech Recipes</b><button id="recipeDrawerClose" type="button">✕ Close</button></div><div id="recipeDrawerBody"></div></aside>
 </div>
 
 <script>
@@ -2600,20 +2608,18 @@ function recipeGuideHTML(){
     return {r,i,matched,ingredients,score:matched*100+recipePower(r).total};
   }).sort((a,b)=>b.score-a.score);
   let h='<div class="hint"><b>Recipe Guide</b> · Collect towers across rounds. Keep ONE of five (or fuse matching towers), then use your permanent pool to forge a 3-metal Mech. Green ✓ = owned; red ○ = missing. Higher star totals make stronger Mechs.</div>';
-  h+='<div class="hint">Best matches first · '+candidates.filter(c=>c.matched===3).length+' ready to forge · '+RECIPES.length+' recipes. Tap a ready recipe to create it from any ingredient.</div>';
+  h+='<div class="hint">Best matches first · '+candidates.filter(c=>c.matched===3).length+' ready to forge · '+RECIPES.length+' recipes. To forge, tap the tower whose location you want to keep.</div>';
   h+='<div style="max-height:220px;overflow-y:auto;display:grid;gap:7px;padding:4px 0">';
   for(const c of candidates){
     const p=recipePower(c.r);
-    h+='<div style="border:1px solid #515b67;border-radius:5px;padding:7px"><b>'+esc(c.r.name)+'</b> · '+p.rank+' · '+c.matched+'/3 owned<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:4px;font-size:12px">'+c.ingredients.join('')+'</div>'+(c.matched===3&&S.phase!=='over'?'<button type="button" class="primary" data-act="forgeFromGuide" data-recipe="'+c.i+'" style="margin-top:6px">Forge now</button>':'')+'</div>';
+    h+='<div style="border:1px solid #515b67;border-radius:5px;padding:7px"><b>'+esc(c.r.name)+'</b> · '+p.rank+' · '+c.matched+'/3 owned<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:4px;font-size:12px">'+c.ingredients.join('')+'</div>' +'</div>';
   }
-  return h+'</div><div class="row"><button type="button" data-act="closeRecipes">Close recipe guide</button></div>';
+  return h+'</div>';
 }
 function renderPanel() {
   let h = '';
   const sel = S.sel ? pieces.get(S.sel) : null;
-  if (S.showRecipes) {
-    h+=recipeGuideHTML();
-  } else if (S.showOdds) {
+  if (S.showOdds) {
     const max = S.odds >= ODDS.length - 1, cost = oddsCost(S.odds);
     h += '<div class="hint">Metal Chance upgrades reach a maximum 20% chance of a 5★ Core at level 10. Combine matching 5★ Cores to create 6★ Mechs.</div>' + oddsTable();
     h += '<div class="row">' + (max ? '<button type="button" disabled>Metal Chance at maximum</button>' :
@@ -2678,8 +2684,9 @@ function renderPanel() {
     const ready=RECIPES.map((r,i)=>({r,i,parts:[...pieces.values()].filter(p=>p.kind==='tower'&&p.special==null&&!p.god&&p.metal===r.metals[0]&&p.tier===r.tiers[0]).map(p=>({p,parts:recipeMatch(r,p)})).find(x=>x.parts)})).filter(x=>x.parts);
     if(ready.length)h+='<div class="hint">⚒ '+ready.length+' special recipe'+(ready.length===1?'':'s')+' ready! Select a matching tower to forge during combat.</div>';
   }
-  if(!S.showRecipes && !S.showOdds && S.phase!=='over')h+='<div class="row"><button type="button" data-act="openRecipes">📖 Recipe Guide · '+RECIPES.length+' Mechs</button></div>';
+
   panel.innerHTML = h;
+  if(document.getElementById('recipeDrawer').classList.contains('open'))document.getElementById('recipeDrawerBody').innerHTML=recipeGuideHTML();
   document.documentElement.style.setProperty('--panel-height',panel.offsetHeight+'px');
   paintCardCanvases();
   const keepFit = Math.abs(cam.s - cam.fit) < 1e-6;
@@ -2690,8 +2697,7 @@ panel.addEventListener('click', (e) => {
   if (!b) return;
   const sel = S.sel ? pieces.get(S.sel) : null;
   switch (b.dataset.act) {
-    case 'openRecipes': S.showRecipes=true;renderPanel();break;
-    case 'closeRecipes': S.showRecipes=false;renderPanel();break;
+
     case 'place': doPlace(); break;
     case 'cancel': S.ghost = null; renderPanel(); break;
     case 'deselect': S.sel = null; renderPanel(); break;
@@ -2699,7 +2705,7 @@ panel.addEventListener('click', (e) => {
     case 'combine': doCombine(sel, pieces.get(+b.dataset.q)); break;
     case 'combineFour': doCombineFour(sel); break;
     case 'forge': forgeRecipe(sel,+b.dataset.recipe,false); break;
-    case 'forgeFromGuide': {const recipe=RECIPES[+b.dataset.recipe];const base=[...pieces.values()].find(p=>p.kind==='tower'&&!p.isNew&&p.special==null&&!p.god&&p.metal===recipe.metals[0]&&p.tier===recipe.tiers[0]);if(base){S.showRecipes=false;forgeRecipe(base,+b.dataset.recipe,false);}break;}
+
     case 'finishForge': finishChoose(); break;
     case 'upgradeSpecial': upgradeSpecial(sel); break;
     case 'buy': buyOdds(); break;
@@ -2710,6 +2716,15 @@ panel.addEventListener('click', (e) => {
   }
 });
 $('bOdds').addEventListener('click', () => { if (S.over) return; S.showOdds = !S.showOdds; renderPanel(); });
+const recipeDrawer=document.getElementById('recipeDrawer');
+function toggleRecipeDrawer(force){
+  const open=force===undefined?!recipeDrawer.classList.contains('open'):force;
+  recipeDrawer.classList.toggle('open',open);
+  document.getElementById('recipeTab').setAttribute('aria-expanded',String(open));
+  if(open)document.getElementById('recipeDrawerBody').innerHTML=recipeGuideHTML();
+}
+document.getElementById('recipeTab').addEventListener('click',()=>toggleRecipeDrawer());
+document.getElementById('recipeDrawerClose').addEventListener('click',()=>toggleRecipeDrawer(false));
 const SPEEDS = [1, 2, 3, 5];
 $('bSpeed').addEventListener('click', () => { S.speed = SPEEDS[(SPEEDS.indexOf(S.speed) + 1) % SPEEDS.length]; });
 
@@ -2768,7 +2783,7 @@ window.__krogoth = {
 
 <script>
 /* Keep installed and browser versions in sync; the badge can force a fresh check. */
-const KROGOTH_VERSION='0.33.0';
+const KROGOTH_VERSION='0.34.0';
 async function krogothCheckUpdate(){
   const tag=document.getElementById('versionTag');
   if(tag){tag.querySelector('.ver-number').textContent='Checking…';tag.disabled=true;}
@@ -2788,6 +2803,6 @@ async function krogothCheckUpdate(){
 }
 document.getElementById('versionTag').addEventListener('click',krogothCheckUpdate);
 if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=33',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
+  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=34',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
 }
 </script>
