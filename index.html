@@ -197,7 +197,7 @@ button.warn { border-color: var(--red); color: var(--red); }
 <div id="app">
   <canvas id="cv" aria-label="Krogoth game field"></canvas>
   <header id="hud">
-    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.28.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
+    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.29.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
     <div class="stat"><span class="lbl">Wave</span><b id="hWave">1</b></div>
     <div class="stat lives"><span class="lbl">Lives</span><b id="hLives">20</b></div>
     <div class="stat gold"><span class="lbl">Gold</span><b id="hGold">10</b></div>
@@ -278,12 +278,12 @@ const ODDS = [
 // Every one of the seven metals at each of tiers 1-5 is used as a core ingredient.
 const RECIPES = [
   {name:'Tempest Engine', metals:[1,2,6], tiers:[5,4,1], role:'Storm-driven anti-air artillery'},
-  {name:'Siege Colossus', metals:[0,4,5], tiers:[5,5,3], role:'Armoured siege and gold support'},
+  {name:'Siege Colossus', metals:[0,4,5], tiers:[5,4,3], role:'Armoured siege and gold support'},
   {name:'Plague Reactor', metals:[3,1,0], tiers:[5,2,4], role:'Radiation and chain reactions'},
-  {name:'Glacier Sentinel', metals:[2,6,4], tiers:[5,1,5], role:'Cryogenic interception'},
+  {name:'Glacier Sentinel', metals:[2,6,4], tiers:[5,1,4], role:'Cryogenic interception'},
   {name:'Solar Sovereign', metals:[5,3,1], tiers:[5,4,4], role:'Economic power and energy'},
-  {name:'Skybreaker', metals:[6,4,2], tiers:[5,5,2], role:'Precision aerial suppression'},
-  {name:'Iron Tempest', metals:[4,0,3], tiers:[5,3,5], role:'Piercing siege and fallout'},
+  {name:'Skybreaker', metals:[6,4,2], tiers:[5,4,2], role:'Precision aerial suppression'},
+  {name:'Iron Tempest', metals:[4,0,3], tiers:[5,3,4], role:'Piercing siege and fallout'},
 ];
 const FORGE_PREFIX=['Scout','Vanguard','Sentinel','Warforged','Ascendant'];
 const FORGE_SUFFIX=['Bulwark','Conductor','Cryowarden','Blightbringer','Lancer','Treasurer','Interceptor'];
@@ -299,6 +299,10 @@ for(let tier=1;tier<=5;tier++)for(let metal=0;metal<METALS.length;metal++){
     tiers:[tier,Math.max(1,tier-1),Math.min(5,tier+1)],
     role:METALS[metal].role+' / '+METALS[m2].name+' / '+METALS[m3].name
   });
+}
+// Invariant: every recipe may use at most one 5-star ingredient.
+for(const recipe of RECIPES){
+  if(recipe.tiers.filter(t=>t===5).length>1)throw Error('Unbalanced recipe: '+recipe.name);
 }
 function recipePower(recipe){
   const total=recipe.tiers.reduce((a,b)=>a+b,0);
@@ -2728,7 +2732,7 @@ window.__krogoth = {
 
 <script>
 /* Keep installed and browser versions in sync; the badge can force a fresh check. */
-const KROGOTH_VERSION='0.28.0';
+const KROGOTH_VERSION='0.29.0';
 async function krogothCheckUpdate(){
   const tag=document.getElementById('versionTag');
   if(tag){tag.querySelector('.ver-number').textContent='Checking…';tag.disabled=true;}
@@ -2748,6 +2752,6 @@ async function krogothCheckUpdate(){
 }
 document.getElementById('versionTag').addEventListener('click',krogothCheckUpdate);
 if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=28',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
+  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=29',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
 }
 </script>
