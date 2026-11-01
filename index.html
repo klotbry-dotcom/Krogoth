@@ -204,7 +204,7 @@ button.warn { border-color: var(--red); color: var(--red); }
 <div id="app">
   <canvas id="cv" aria-label="Krogoth game field"></canvas>
   <header id="hud">
-    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.36.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
+    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.40.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
     <div class="stat"><span class="lbl">Wave</span><b id="hWave">1</b></div>
     <div class="stat lives"><span class="lbl">Lives</span><b id="hLives">20</b></div>
     <div class="stat gold"><span class="lbl">Gold</span><b id="hGold">10</b></div>
@@ -565,7 +565,8 @@ function stats(p) {
   const god=p.god===true;
   const forge=p.special!=null?recipePower(RECIPES[p.special]):null;
   const power=forge?forge.factor:1;
-  return { dmg: m.dmg * TIER_MULT[t - 1] * p.aura * killBoost(p) * (1+level*0.25)*(god?3.5:1)*power, rng: m.rng + 0.3 * (t - 1) + (mech ? 1 : 0) + level*0.25+(god?2.5:0)+(forge?Math.max(-1,(forge.total-9)*0.18):0), cd:cd/(1+level*0.08)/(god?1.6:1)/(forge?0.75+forge.total*0.025:1) };
+  const ability=forge?(forge.total>=12?1.22:forge.total>=9?1.12:1.05):1;
+  return { dmg: m.dmg * TIER_MULT[t - 1] * p.aura * killBoost(p) * (1+level*0.25)*(god?3.5:1)*power*ability, rng: m.rng + 0.3 * (t - 1) + (mech ? 1 : 0) + level*0.25+(god?2.5:0)+(forge?Math.max(-1,(forge.total-9)*0.18):0), cd:cd/(1+level*0.08)/(god?1.6:1)/(forge?0.75+forge.total*0.025:1) };
 }
 
 function specialText(p) {
@@ -1426,6 +1427,18 @@ function waveInfo(n) {
   if (n % 7 === 0) return { kind: 'fast', count: c + 2 };
   return { kind: 'ground', count: c };
 }
+const TARGET_MODES=['First','Strongest','Weakest','Closest','Boss'];
+const BOSS_NAMES=['Siege Breaker','Brood Engine','Dread Carrier'];
+function bossType(n){return Math.floor(n/10-1)%3;}
+function targetScore(p,e){
+  const mode=p.targetMode||'First';
+  const dist=Math.hypot(e.x-p.x-1,e.y-p.y-1);
+  if(mode==='Strongest')return e.hp;
+  if(mode==='Weakest')return -e.hp;
+  if(mode==='Closest')return -dist;
+  if(mode==='Boss')return (e.kind==='boss'?1000000:0)+e.prog;
+  return e.prog;
+}
 const KIND_LABEL = { ground: 'Ground', air: 'Air', fast: 'Fast', boss: 'Boss' };
 function baseHp(n) { return Math.round(5 * Math.pow(1.19, n - 1) + 2.5 * (n - 1)); }
 function startWave() {
@@ -1444,7 +1457,7 @@ function startWave() {
       S.spawnQ.push(kind);
     }
   }
-  if(n>=6) S.texts.push({screen:true,txt:n%10===0?'BOSS ASSAULT':n%4===0?'AIR RAID + ESCORTS':n%7===0?'RAPID ASSAULT':'MIXED HOSTILES',t:0,dur:2.2});
+  if(n>=6) S.texts.push({screen:true,txt:n%10===0?BOSS_NAMES[bossType(n)].toUpperCase():n%4===0?'AIR RAID + ESCORTS':n%7===0?'RAPID ASSAULT':'MIXED HOSTILES',t:0,dur:2.2});
   S.spawnT = 0.2;
   S.phase = 'wave';
   S.sel = null;
@@ -1466,7 +1479,7 @@ function spawnEnemy(kind) {
   const elite = kind!=='boss' && n>=6 && Math.random()<Math.min(0.25,0.07+n*0.006);
   const ehp=def.hp*(elite?2.3:1);
   S.enemies.push({
-    kind, air, elite, hp: ehp, max: ehp, speed: def.spd * speedMult(n)*(elite?1.08:1), reward: def.rew*(elite?3:1), cost: def.lives,
+    kind, air, elite, bossVariant:kind==='boss'?bossType(n):-1, abilityClock:0, summoned:false, shieldClock:0, hp: ehp, max: ehp, speed: def.spd * speedMult(n)*(elite?1.08:1), reward: def.rew*(elite?3:1), cost: def.lives,
     armor: Math.floor(n / 6) + (kind === 'boss' ? 3 : 0) + (elite?2:0),
     nodes, legs, pts, i: 0, x: pts[0][0], y: pts[0][1], prog: 0, dir: 1, alive: true, flash: 0,
     slow: 0, slowT: 0, frozen: 0, pois: 0, poisT: 0, poisSrc: null, ph: Math.random() * 6,
@@ -1475,7 +1488,7 @@ function spawnEnemy(kind) {
 
 function damage(e, amt, src, pierce) {
   if (!e || !e.alive) return;
-  const red = pierce ? 1 : 1 / (1 + 0.07 * e.armor);
+  const red = (pierce ? 1 : 1 / (1 + 0.07 * e.armor)) * (e.kind==='boss'&&e.bossVariant===0?0.72:e.kind==='boss'&&e.bossVariant===2&&Math.sin(S.anim*1.5)>0?0.48:1);
   e.hp -= amt * red;
   e.flash = 0.08;
   if(amt*red>0){
@@ -1497,6 +1510,12 @@ function kill(e, src) {
     }
   }
   S.gold += g;
+  if(e.kind==='boss'){
+    const bonus=20+Math.floor(S.wave*1.5);
+    S.gold+=bonus;
+    S.texts.push({screen:true,txt:BOSS_NAMES[e.bossVariant]+' DEFEATED · +'+bonus+' GOLD',t:0,dur:3});
+    S.shake=Math.max(S.shake,.7);
+  }
   if(e.elite) S.texts.push({x:e.x,y:e.y-1.3,txt:'ELITE +'+g+' GOLD',t:0,dur:1.3});
   S.kills++;
   explode(e);
@@ -1679,8 +1698,8 @@ function update(dt) {
     let want;
     if (anyEnemy && S.phase === 'wave') {
       const st = stats(p);
-      let bestE = null, bp = -1;
-      for (const e of S.enemies) if (e.alive && e.prog > bp && Math.hypot(e.x - p.x - 1, e.y - p.y - 1) <= st.rng) { bp = e.prog; bestE = e; }
+      let bestE = null, bp = -Infinity;
+      for (const e of S.enemies) if (e.alive && Math.hypot(e.x - p.x - 1, e.y - p.y - 1) <= st.rng) { const score=targetScore(p,e);if(score>bp){bp=score;bestE=e;} }
       p.tgt = bestE;
     } else p.tgt = null;
     if (p.tgt) { const [bx, by] = itemCenter(p), [tx, ty] = aimPoint(p.tgt); want = Math.atan2(ty - by, tx - bx); }
@@ -1707,6 +1726,11 @@ function update(dt) {
   for (const e of S.enemies) {
     if (!e.alive) continue;
     if (e.flash > 0) e.flash -= dt;
+    if(e.kind==='boss'){
+      e.abilityClock+=dt;
+      if(e.bossVariant===1&&!e.summoned&&e.hp<e.max*.55){e.summoned=true;for(let j=0;j<5;j++)S.spawnQ.unshift('fast');S.texts.push({screen:true,txt:'BROOD ENGINE · REINFORCEMENTS',t:0,dur:2});}
+      if(e.bossVariant===2&&e.abilityClock>7){e.abilityClock=0;S.spawnQ.unshift('air');S.effects.push({type:'ring',x:e.x,y:e.y,r:2,col:'#ad83ff',t:0,dur:.6});}
+    }
     if (e.slowT > 0) { e.slowT -= dt; if (e.slowT <= 0) e.slow = 0; }
     if (e.frozen > 0) e.frozen -= dt;
     if (e.poisT > 0) {
@@ -2766,6 +2790,7 @@ function renderPanel() {
     const left = S.spawnQ.length + S.enemies.filter((e) => e.alive).length;
     if (sel) {
       h += pieceCard(sel);
+      if(sel.kind==='tower')h+='<div class="row"><span class="hint">Target:</span>'+TARGET_MODES.map(mode=>'<button type="button" data-act="targetMode" data-mode="'+mode+'"'+((sel.targetMode||'First')===mode?' class="primary"':'')+'>'+mode+'</button>').join('')+'</div>';
       if(sel.kind==='tower'&&sel.special==null&&!sel.god){
         const ready=availableRecipes(sel,false);
         for(const opt of ready)h+='<div class="hint"><b>'+esc(opt.r.name)+'</b> · '+recipePower(opt.r).rank+' · '+opt.r.metals.map((m,i)=>METALS[m].name+' '+opt.r.tiers[i]+'★').join(' + ')+'</div><div class="row"><button type="button" class="primary" data-act="forge" data-recipe="'+opt.i+'">Forge during wave</button></div>';
@@ -2803,6 +2828,7 @@ panel.addEventListener('click', (e) => {
 
     case 'finishForge': finishChoose(); break;
     case 'upgradeSpecial': upgradeSpecial(sel); break;
+    case 'targetMode': if(sel&&sel.kind==='tower'){sel.targetMode=b.dataset.mode;renderPanel();}break;
     case 'buy': buyOdds(); break;
     case 'closeOdds': S.showOdds = false; renderPanel(); break;
     case 'restart': newGame(); break;
@@ -2878,7 +2904,7 @@ window.__krogoth = {
 
 <script>
 /* Keep installed and browser versions in sync; the badge can force a fresh check. */
-const KROGOTH_VERSION='0.36.0';
+const KROGOTH_VERSION='0.40.0';
 async function krogothCheckUpdate(){
   const tag=document.getElementById('versionTag');
   if(tag){tag.querySelector('.ver-number').textContent='Checking…';tag.disabled=true;}
@@ -2898,6 +2924,6 @@ async function krogothCheckUpdate(){
 }
 document.getElementById('versionTag').addEventListener('click',krogothCheckUpdate);
 if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=36',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
+  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=40',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
 }
 </script>
