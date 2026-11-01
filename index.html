@@ -204,7 +204,7 @@ button.warn { border-color: var(--red); color: var(--red); }
 <div id="app">
   <canvas id="cv" aria-label="Krogoth game field"></canvas>
   <header id="hud">
-    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.42.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
+    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.43.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
     <div class="stat"><span class="lbl">Wave</span><b id="hWave">1</b></div>
     <div class="stat lives"><span class="lbl">Lives</span><b id="hLives">20</b></div>
     <div class="stat gold"><span class="lbl">Gold</span><b id="hGold">10</b></div>
@@ -1143,54 +1143,103 @@ function whiten(spr) {
   return c;
 }
 
-// 32px remaster pass: preserve each original metal/tier silhouette while
-// adding finer bevels, recessed seams, rivets, and high-frequency specular detail.
-function remasterBasicSprite(sprite,mi,tier){
-  const src=sprite.c, c=document.createElement('canvas');c.width=32;c.height=32;
-  const g=c.getContext('2d',{willReadFrequently:true});
-  g.imageSmoothingEnabled=false;g.drawImage(src,0,0,32,32);
-  const data=g.getImageData(0,0,32,32),a=data.data;
-  const filled=(x,y)=>x>=0&&y>=0&&x<32&&y<32&&a[(y*32+x)*4+3]>0;
-  const px=(x,y,col)=>{g.fillStyle=col;g.fillRect(x,y,1,1);};
-  const C=METALS[mi].c;
-  // Micro-bevel on every raised contour, but keep the transparent silhouette.
-  for(let y=2;y<29;y++)for(let x=2;x<30;x++){
-    if(!filled(x,y)||!filled(x-1,y)||!filled(x,y-1))continue;
-    if(!filled(x+1,y)&&filled(x-1,y)&&((x+y)%3===0))px(x,y,'rgba(9,15,22,0.35)');
-    else if(!filled(x-1,y)&&filled(x+1,y)&&((x+y)%3===0))px(x,y,'rgba(232,241,250,0.26)');
-    else if(!filled(x,y-1)&&filled(x,y+1)&&((x+y)%4===0))px(x,y,'rgba(224,236,246,0.25)');
-  }
-  // Pixel-scale precision hardware: fine vents, tiny bolts and side conduits.
-  const bolts=[[6,24],[25,24],[7,27],[24,27]];
-  for(const [x,y] of bolts)if(filled(x,y)){px(x,y,'#aab6c0');if(filled(x+1,y+1))px(x+1,y+1,'#19212a');}
-  for(let j=0;j<3;j++){
-    const y=20+j*2;
-    for(const x of [8,22])if(filled(x,y)&&filled(x+1,y))px(x,y,'rgba(14,21,29,0.7)');
-  }
-  // Tier progression: increasing machined plating, luminescent sensors,
-  // and delicate material-specific highlights without changing tower identity.
-  if(tier>=2){
-    for(const x of [5,26])for(const y of [15,18])if(filled(x,y))px(x,y,C[2]);
-    for(let j=0;j<4;j++){const x=11+j*3,y=25;if(filled(x,y))px(x,y,'rgba(210,223,230,0.55)');}
-  }
-  if(tier>=3){
-    for(let j=0;j<4;j++){const x=9+j*4,y=10;if(filled(x,y))px(x,y,C[3]);}
-    for(const x of [4,27]){if(filled(x,20))px(x,20,C[3]);}
-  }
-  if(tier>=4){
-    for(const y of [11,13,15])for(const x of [10,21])if(filled(x,y))px(x,y,'rgba(235,245,255,0.62)');
-    for(const x of [7,24])if(filled(x,22))px(x,22,C[3]);
-  }
-  if(tier===5){
-    for(let x=11;x<=20;x+=3)if(filled(x,7))px(x,7,'#f5f7ff');
-    for(const x of [6,25])for(const y of [9,12,15])if(filled(x,y))px(x,y,C[3]);
-  }
-  // Deliberately no smoothing: this is detailed pixel art, not blurry scaling.
-  return {c,mask:sprite.mask};
+// Native 32x32 tower artwork. Each metal has a distinct machine silhouette;
+// five tiers progressively add structure, weaponry and illuminated mechanisms.
+function sprBasic32(mi,tier){
+ const P=painter(32,32),C=METALS[mi].c,k=METALS[mi].k;
+ const dark='#151d26',frame='#35434e',steel='#748795',shine='#bdcbd3';
+ const R=(x,y,w,h,c)=>{for(let yy=y;yy<y+h;yy++)for(let xx=x;xx<x+w;xx++)P.set(xx,yy,c);};
+ const bolt=(x,y)=>{R(x,y,2,2,shine);P.set(x+1,y+1,dark);};
+ const panel=(x,y,w,h,c)=>{R(x,y,w,h,dark);R(x+1,y+1,w-2,h-2,c);R(x+1,y+1,w-2,1,C[3]);R(x+w-2,y+2,1,h-3,C[0]);};
+ const lamp=(x,y)=>{R(x-1,y-1,4,4,C[0]);R(x,y,2,2,C[3]);P.set(x,y,'#f2faff');};
+ // Shared heavy, perspective-mounted steel footplate.
+ R(4,26,24,3,dark);R(6,24,20,3,frame);R(8,24,16,1,steel);
+ R(7,29,18,1,C[1]);for(const x of [7,23])bolt(x,26);
+ // Unique silhouettes: all geometry is authored at native 32px, not scaled from 16px.
+ switch(k){
+ case 'iron':
+  // Squat riveted cannon battery, broad gun shield and twin muzzle blocks.
+  panel(7,14,18,11,C[1]);R(9,12,14,4,C[2]);
+  R(5,16,5,8,frame);R(22,16,5,8,frame);
+  R(10,8,5,10,C[1]);R(17,8,5,10,C[1]);
+  R(11,5,3,8,steel);R(18,5,3,8,steel);
+  R(11,5,3,2,dark);R(18,5,3,2,dark);
+  R(12,18,8,5,C[0]);R(13,18,6,2,C[3]);
+  for(const x of [8,22])for(const y of [17,22])bolt(x,y);
+  break;
+ case 'copper':
+  // Vertical Tesla capacitor, split induction coils, tall discharge prongs.
+  panel(9,14,14,11,C[1]);
+  for(const x of [6,23]){R(x,9,3,14,frame);R(x+1,5,2,6,steel);lamp(x,5);}
+  R(12,8,8,15,C[0]);R(13,7,6,15,C[1]);
+  for(let y=9;y<22;y+=3){R(11,y,10,2,C[2]);R(12,y,8,1,C[3]);}
+  R(15,3,2,6,steel);lamp(15,3);
+  break;
+ case 'cobalt':
+  // Cryogenic twin pressure tanks with icy finned heat exchanger.
+  panel(7,18,18,7,C[1]);
+  for(const x of [8,19]){R(x,9,6,13,C[0]);R(x+1,7,4,15,C[1]);R(x+2,7,2,13,C[2]);R(x+1,7,4,2,C[3]);R(x+2,5,2,3,shine);}
+  R(14,13,4,10,frame);R(15,10,2,10,'#b8efff');
+  for(const y of [12,16,20])R(13,y,6,1,steel);
+  lamp(15,8);
+  break;
+ case 'uranium':
+  // Reinforced containment vessel with large luminous radioactive core.
+  panel(6,13,20,12,frame);R(9,8,14,15,C[0]);
+  R(11,7,10,16,C[1]);R(13,9,6,12,C[2]);
+  R(14,11,4,8,C[3]);R(15,13,2,4,'#f0ffc8');
+  for(const x of [7,23]){R(x,10,3,14,steel);R(x+1,8,1,4,C[3]);}
+  R(11,6,10,2,steel);R(12,5,8,1,shine);
+  for(const y of [12,19]){R(9,y,3,2,dark);R(20,y,3,2,dark);}
+  break;
+ case 'tungsten':
+  // Long electromagnetic rail cannon over an armoured recoil cradle.
+  panel(6,17,20,8,C[1]);R(10,12,12,7,C[0]);
+  R(13,3,6,17,frame);R(14,2,4,17,C[1]);
+  R(14,1,4,4,dark);R(15,1,2,3,C[3]);
+  R(12,5,2,13,steel);R(18,5,2,13,steel);
+  for(const y of [7,11,15]){R(12,y,8,2,C[2]);R(15,y,2,1,C[3]);}
+  for(const x of [7,23])R(x,14,3,8,frame);
+  break;
+ case 'gold':
+  // Gilded radar and treasury generator, with a distinctive crowned dish.
+  panel(7,16,18,9,C[1]);R(10,12,12,7,C[2]);
+  R(14,7,4,11,C[1]);R(15,5,2,9,C[3]);
+  R(6,7,20,3,C[1]);R(8,5,16,3,C[2]);R(11,3,10,3,C[3]);
+  R(14,2,4,2,'#fff7c4');lamp(15,8);
+  for(const x of [10,20]){R(x,19,2,4,C[3]);bolt(x,23);}
+  break;
+ case 'titanium':
+  // Lightweight anti-air turret, twin rotary barrels and side stabilisers.
+  panel(9,15,14,10,C[1]);R(12,11,8,7,C[2]);
+  for(const x of [7,20]){R(x,6,5,13,frame);R(x+1,4,3,13,C[2]);R(x+2,3,1,12,shine);R(x+1,3,3,2,dark);}
+  R(5,18,5,5,steel);R(22,18,5,5,steel);
+  R(13,17,6,5,C[0]);R(14,17,4,2,C[3]);lamp(15,12);
+  break;
+ }
+ // Tier-dependent engineering complexity, distinct at normal game scale.
+ if(tier>=2){
+  for(const x of [5,25]){R(x,22,2,4,C[2]);P.set(x,22,C[3]);}
+  for(let x=10;x<23;x+=4)if(P.get(x,24))P.set(x,24,shine);
+ }
+ if(tier>=3){
+  for(const x of [4,26]){R(x,17,2,5,frame);R(x,17,2,1,C[3]);}
+  for(const x of [10,20])lamp(x,21);
+ }
+ if(tier>=4){
+  for(const x of [5,24]){R(x,11,3,5,C[0]);R(x+1,11,1,3,C[3]);}
+  R(11,25,10,2,C[2]);for(const x of [12,17])P.set(x,25,C[3]);
+ }
+ if(tier===5){
+  R(10,27,12,2,C[2]);for(let x=11;x<22;x+=3)P.set(x,27,C[3]);
+  for(const x of [3,27]){R(x,12,2,9,C[1]);R(x,12,2,2,C[3]);}
+  R(14,0,4,2,C[3]);R(15,0,2,1,'#ffffff');
+ }
+ return P.done();
 }
 const SPRITES = {};
 function buildSprites() {
-  SPRITES.piece = METALS.map((_, mi) => [sprOre(mi), sprIngot(mi), sprRod(mi), sprBolt(mi), sprCore(mi)].map((spr,i)=>remasterBasicSprite(spr,mi,i+1)).concat([[sprMech(mi, 0), sprMech(mi, 1)]]));
+  SPRITES.piece = METALS.map((_, mi) => [1,2,3,4,5].map(tier=>sprBasic32(mi,tier)).concat([[sprMech(mi, 0), sprMech(mi, 1)]]));
   SPRITES.scrap = [sprScrap(0), sprScrap(1), sprScrap(2)];
   SPRITES.plinth = sprPlinth();
   SPRITES.enemy = {
@@ -3000,7 +3049,7 @@ window.__krogoth = {
 
 <script>
 /* Keep installed and browser versions in sync; the badge can force a fresh check. */
-const KROGOTH_VERSION='0.42.0';
+const KROGOTH_VERSION='0.43.0';
 async function krogothCheckUpdate(){
   const tag=document.getElementById('versionTag');
   if(tag){tag.querySelector('.ver-number').textContent='Checking…';tag.disabled=true;}
@@ -3020,6 +3069,6 @@ async function krogothCheckUpdate(){
 }
 document.getElementById('versionTag').addEventListener('click',krogothCheckUpdate);
 if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=42',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
+  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=43',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
 }
 </script>
