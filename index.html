@@ -197,7 +197,7 @@ button.warn { border-color: var(--red); color: var(--red); }
 <div id="app">
   <canvas id="cv" aria-label="Krogoth game field"></canvas>
   <header id="hud">
-    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.24.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
+    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.25.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
     <div class="stat"><span class="lbl">Wave</span><b id="hWave">1</b></div>
     <div class="stat lives"><span class="lbl">Lives</span><b id="hLives">20</b></div>
     <div class="stat gold"><span class="lbl">Gold</span><b id="hGold">10</b></div>
@@ -284,8 +284,8 @@ const RECIPES = [
   {name:'Iron Tempest', metals:[4,0,3], tiers:[5,3,2], role:'Piercing siege and fallout'},
 ];
 function recipeMatch(recipe, base, newOnly=false) {
-  if(!base||base.kind!=='tower'||base.special||base.metal!==recipe.metals[0]||base.tier!==5)return null;
-  const used=[base], candidates=[...pieces.values()].filter(p=>p.kind==='tower'&&!p.special&&p!==base&&(!newOnly||p.isNew));
+  if(!base||base.kind!=='tower'||base.special!=null||base.metal!==recipe.metals[0]||base.tier!==5)return null;
+  const used=[base], candidates=[...pieces.values()].filter(p=>p.kind==='tower'&&p.special==null&&p!==base&&(!newOnly||p.isNew));
   for(let i=1;i<3;i++){
     const q=candidates.find(p=>!used.includes(p)&&p.metal===recipe.metals[i]&&p.tier===recipe.tiers[i]);
     if(!q)return null;used.push(q);
@@ -298,15 +298,14 @@ function availableRecipes(base, newOnly=false){
 function forgeRecipe(base,index,newOnly=false){
   const recipe=RECIPES[index], parts=recipe&&recipeMatch(recipe,base,newOnly);
   if(!parts||!['choose','forge'].includes(S.phase))return;
-  if(S.phase==='choose'&&!parts.every(p=>p.isNew))return;
-  if(S.phase==='forge'&&!parts.some(p=>p.isNew))return;
+  if(S.phase==='choose')return;
+  if(S.phase==='forge'&&!parts.some(p=>p.id===S.chosen))return;
   base.kills=parts.reduce((n,p)=>n+(p.kills||0),0);
   base.tier=6;base.special=index;base.upgrade=0;base.isNew=false;
   for(const p of parts.slice(1))toScrap(p);
   burst(base.x+1,base.y+1,METALS[base.metal].c[3],35);
   S.effects.push({type:'ring',x:base.x+1,y:base.y+1,r:3,col:'#ffe09a',t:0,dur:0.8});
-  if(S.phase==='choose'){S.chosen=base.id;S.phase='forge';S.sel=base.id;}
-  else {S.sel=base.id;}
+  S.sel=base.id;
   computeAuras();renderPanel();
 }
 function specialCost(p){return Math.round(20*Math.pow((p.upgrade||0)+1,1.7));}
@@ -1248,17 +1247,24 @@ function doPlace() {
   renderPanel();
 }
 function partnersFor(p) {
-  if (!['choose','forge'].includes(S.phase) || p.kind !== 'tower' || p.tier >= 6 || p.special!=null) return [];
+  if (S.phase!=='choose' || !p.isNew || p.kind !== 'tower' || p.tier >= 6 || p.special!=null) return [];
   const out = [];
   for (const q of pieces.values()) {
     if (q === p || q.kind !== 'tower' || q.metal !== p.metal || q.tier !== p.tier) continue;
-    if (!p.isNew && !q.isNew) continue;
+    if (!q.isNew) continue;
     out.push(q);
   }
   out.sort((a, b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0));
   return out;
 }
 function toScrap(p) { p.kind = 'scrap'; p.isNew = false; }
+function enterSpecialPool(id){
+  S.chosen=id;
+  for(const n of S.newIds){const p=pieces.get(n);if(p&&p.id!==id&&p.isNew)toScrap(p);}
+  for(const p of pieces.values())p.isNew=false;
+  S.newIds=[];S.phase='forge';S.sel=id;
+  computeAuras();renderPanel();
+}
 function finishChoose() {
   for (const id of S.newIds) { const q = pieces.get(id); if (q && q.isNew) toScrap(q); }
   for (const q of pieces.values()) q.isNew = false;
@@ -1271,9 +1277,8 @@ function finishChoose() {
 }
 function doKeep(p) {
   if (!p || !p.isNew || S.phase!=='choose') return;
-  p.isNew = false;S.chosen=p.id;
   burst(p.x + 1, p.y + 1, '#ffffff', 14);
-  S.phase='forge';S.sel=p.id;renderPanel();
+  enterSpecialPool(p.id);
 }
 function doCombine(p, q) {
   if (!p || !q || !partnersFor(p).includes(q)) return;
@@ -1283,7 +1288,7 @@ function doCombine(p, q) {
   toScrap(q);
   burst(p.x + 1, p.y + 1, METALS[p.metal].c[3], 26);
   S.effects.push({ type: 'ring', x: p.x + 1, y: p.y + 1, r: 2.5, col: METALS[p.metal].c[3], t: 0, dur: 0.6 });
-  S.chosen=p.id;S.phase='forge';S.sel=p.id;computeAuras();renderPanel();
+  enterSpecialPool(p.id);
 }
 function doDispose(p) {
   if (!p || p.kind !== 'scrap') return;
@@ -2556,7 +2561,7 @@ function renderPanel() {
       h += pieceCard(sel) + '<div class="row"><button type="button" class="warn" data-act="dispose">Dispose</button><button type="button" data-act="deselect">Back</button></div>';
     } else if (sel && sel.kind === 'tower') {
       const partners = S.phase==='choose'?partnersFor(sel):[];
-      const recipeOptions=availableRecipes(sel,S.phase==='choose');
+      const recipeOptions=S.phase==='forge'?availableRecipes(sel,false).filter(o=>o.parts.some(p=>p.id===S.chosen)):[];
       h += pieceCard(sel) + '<div class="row">';
       if (S.phase==='choose' && sel.isNew) h += '<button type="button" class="primary" data-act="keep">Keep this</button>';
       if (partners.length && sel.tier < 6) h += '<button type="button" class="primary" data-act="combine" data-q="' + partners[0].id + '">Combine into ' + esc(pieceName(sel.metal, sel.tier + 1)) + '</button>';
@@ -2566,12 +2571,12 @@ function renderPanel() {
       if (!sel.isNew && !partners.length && S.phase==='choose') h += '<div class="hint dim">Pick one of the new pieces (amber outline).</div>';
     } else {
       const anyCombo = S.newIds.some((id) => { const p = pieces.get(id); return p && partnersFor(p).length; });
-      h += '<div class="hint">Select one of your five new towers. Three-metal recipes can be forged immediately if all ingredients are new. After choosing, use the remaining new towers with your older towers, then finish the round.</div>';
-      if(S.phase==='forge')h+='<div class="row"><button type="button" class="primary" data-act="finishForge">Finish forging · Start wave</button></div>';
+      h += '<div class="hint">Choose ONE of your five towers, or combine two matching new towers into ONE. All other new towers become scrap. Your survivor then joins the existing towers for special recipes.</div>';
+      if(S.phase==='forge')h+='<div class="hint">Your chosen tower has joined the special pool.</div>';
       h += '<div class="hint">Pick one new piece to keep. The other four become scrap. ' + (anyCombo ? '<span class="dim">You have a match, so you can combine.</span>' : '') + '</div>';
     }
     if(S.phase==='forge'){
-      h+='<div class="hint">Forge stage: combine remaining new metals with existing towers. Unused new metals become scrap when you finish.</div>';
+      h+='<div class="hint">Special pool: your ONE selected tower and all previously kept towers. Forge any available three-metal recipe, or continue without forging. All other new placements are already scrap.</div>';
       h+='<div class="row"><button type="button" class="primary" data-act="finishForge">Finish forging · Start wave</button></div>';
     }
   } else if (S.phase === 'countdown' || S.phase === 'wave') {
@@ -2668,7 +2673,7 @@ window.__krogoth = {
 
 <script>
 /* Keep installed and browser versions in sync; the badge can force a fresh check. */
-const KROGOTH_VERSION='0.24.0';
+const KROGOTH_VERSION='0.25.0';
 async function krogothCheckUpdate(){
   const tag=document.getElementById('versionTag');
   if(tag){tag.querySelector('.ver-number').textContent='Checking…';tag.disabled=true;}
@@ -2688,6 +2693,6 @@ async function krogothCheckUpdate(){
 }
 document.getElementById('versionTag').addEventListener('click',krogothCheckUpdate);
 if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=24',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
+  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=25',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
 }
 </script>
