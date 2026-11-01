@@ -197,7 +197,7 @@ button.warn { border-color: var(--red); color: var(--red); }
 <div id="app">
   <canvas id="cv" aria-label="Krogoth game field"></canvas>
   <header id="hud">
-    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.31.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
+    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.32.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
     <div class="stat"><span class="lbl">Wave</span><b id="hWave">1</b></div>
     <div class="stat lives"><span class="lbl">Lives</span><b id="hLives">20</b></div>
     <div class="stat gold"><span class="lbl">Gold</span><b id="hGold">10</b></div>
@@ -327,16 +327,14 @@ function availableRecipes(base, newOnly=false){
 }
 function forgeRecipe(base,index,newOnly=false){
   const recipe=RECIPES[index], parts=recipe&&recipeMatch(recipe,base,newOnly);
-  if(!parts||!['choose','forge'].includes(S.phase))return;
-  if(S.phase==='choose')return;
-  if(S.phase==='forge'&&!parts.some(p=>p.id===S.chosen))return;
+  if(!parts||!['countdown','wave'].includes(S.phase))return;
   base.kills=parts.reduce((n,p)=>n+(p.kills||0),0);
   base.tier=6;base.special=index;base.upgrade=0;base.isNew=false;
   for(const p of parts)if(p!==base)toScrap(p);
   burst(base.x+1,base.y+1,METALS[base.metal].c[3],35);
   S.effects.push({type:'ring',x:base.x+1,y:base.y+1,r:3,col:'#ffe09a',t:0,dur:0.8});
   S.sel=base.id;
-  computeAuras();renderPanel();
+  computeAuras();rerouteGround();renderPanel();
 }
 function specialCost(p){return Math.round(20*Math.pow((p.upgrade||0)+1,1.7));}
 function upgradeSpecial(p){
@@ -1295,7 +1293,7 @@ function enterSpecialPool(id){
   S.chosen=id;
   for(const n of S.newIds){const p=pieces.get(n);if(p&&p.id!==id&&p.isNew)toScrap(p);}
   for(const p of pieces.values())p.isNew=false;
-  S.newIds=[];S.phase='forge';S.sel=id;
+  S.newIds=[];S.phase='countdown';S.countdown=2.2;S.sel=null;S.chosen=null;
   computeAuras();renderPanel();
 }
 function finishChoose() {
@@ -2586,7 +2584,7 @@ function oddsTable() {
   return h + '</tbody></table>';
 }
 function recipeGuideHTML(){
-  const owned=[...pieces.values()].filter(p=>p.kind==='tower'&&p.special==null&&!p.god&&(!p.isNew||S.phase==='forge'));
+  const owned=[...pieces.values()].filter(p=>p.kind==='tower'&&p.special==null&&!p.god&&!p.isNew);
   const available=new Map();
   for(const p of owned){const k=p.metal+':'+p.tier;available.set(k,(available.get(k)||0)+1);}
   const candidates=RECIPES.map((r,i)=>{
@@ -2639,12 +2637,12 @@ function renderPanel() {
       const len = S.path ? Math.round(pathLength(S.path)) : 0;
       h += '<div class="hint">Piece ' + (S.placed + 1) + ' of 5. Tap an open spot on the floor. <span class="dim">Route length ' + len + '.</span></div>';
     }
-  } else if (S.phase === 'choose' || S.phase === 'forge') {
+  } else if (S.phase === 'choose') {
     if (sel && sel.kind === 'scrap') {
       h += pieceCard(sel) + '<div class="row"><button type="button" class="warn" data-act="dispose">Dispose</button><button type="button" data-act="deselect">Back</button></div>';
     } else if (sel && sel.kind === 'tower') {
       const partners = S.phase==='choose'?partnersFor(sel):[];
-      const recipeOptions=S.phase==='forge'?availableRecipes(sel,false).filter(o=>o.parts.some(p=>p.id===S.chosen)):[];
+      const recipeOptions=[];
       h += pieceCard(sel) + '<div class="row">';
       if (S.phase==='choose' && sel.isNew) h += '<button type="button" class="primary" data-act="keep">Keep this</button>';
       if (partners.length && sel.tier < 6) h += '<button type="button" class="primary" data-act="combine" data-q="' + partners[0].id + '">Combine 2 → ' + esc(pieceName(sel.metal, sel.tier + 1)) + '</button>';
@@ -2656,21 +2654,26 @@ function renderPanel() {
     } else {
       const anyCombo = S.newIds.some((id) => { const p = pieces.get(id); return p && partnersFor(p).length; });
       h += '<div class="hint">Choose ONE of your five towers, combine TWO matching towers (+1 tier), or combine FOUR matching towers (+2 tiers). All other new towers become scrap. Your survivor then joins the existing towers for special recipes.</div>';
-      if(S.phase==='forge')h+='<div class="hint">Your chosen tower has joined the special pool. Open Recipe Guide to see what you can forge or which ingredients to save.</div>';
+
       h += '<div class="hint">Pick one new piece to keep. The other four become scrap. ' + (anyCombo ? '<span class="dim">You have a match, so you can combine.</span>' : '') + '</div>';
     }
-    if(S.phase==='forge'){
-      h+='<div class="hint">Special pool: your ONE selected tower and all previously kept towers. Forge any available three-metal recipe, or continue without forging. All other new placements are already scrap.</div>';
-      h+='<div class="row"><button type="button" class="primary" data-act="finishForge">Finish forging · Start wave</button></div>';
-    }
+
   } else if (S.phase === 'countdown' || S.phase === 'wave') {
     const left = S.spawnQ.length + S.enemies.filter((e) => e.alive).length;
     if (sel) {
       h += pieceCard(sel);
+      if(sel.kind==='tower'&&sel.special==null&&!sel.god){
+        const ready=availableRecipes(sel,false);
+        for(const opt of ready)h+='<div class="hint"><b>'+esc(opt.r.name)+'</b> · '+recipePower(opt.r).rank+' · '+opt.r.metals.map((m,i)=>METALS[m].name+' '+opt.r.tiers[i]+'★').join(' + ')+'</div><div class="row"><button type="button" class="primary" data-act="forge" data-recipe="'+opt.i+'">Forge during wave</button></div>';
+      }
       if(sel.special!=null)h+='<div class="row"><button type="button" class="primary" data-act="upgradeSpecial"'+((sel.upgrade||0)>=5||S.gold<specialCost(sel)?' disabled':'')+'>' + ((sel.upgrade||0)>=5?'Fully upgraded':'Upgrade special · '+specialCost(sel)+' gold')+'</button></div>';
       h += '<div class="row">' + (sel.kind === 'scrap' ? '<button type="button" class="warn" data-act="dispose">Dispose</button>' : '') + '<button type="button" data-act="deselect">Close</button></div>';
     } else if (S.phase === 'countdown') h += '<div class="hint">Get ready.</div>';
     else h += '<div class="hint">Wave ' + S.wave + ' (' + KIND_LABEL[waveInfo(S.wave).kind] + '). <span class="dim" id="leftCount">' + left + ' left.</span></div>';
+  }
+  if(!S.showRecipes && !S.showOdds && (S.phase==='wave'||S.phase==='countdown')){
+    const ready=RECIPES.map((r,i)=>({r,i,parts:[...pieces.values()].filter(p=>p.kind==='tower'&&p.special==null&&!p.god&&p.metal===r.metals[0]&&p.tier===r.tiers[0]).map(p=>({p,parts:recipeMatch(r,p)})).find(x=>x.parts)})).filter(x=>x.parts);
+    if(ready.length)h+='<div class="hint">⚒ '+ready.length+' special recipe'+(ready.length===1?'':'s')+' ready! Select a matching tower to forge during combat.</div>';
   }
   if(!S.showRecipes && !S.showOdds && S.phase!=='over')h+='<div class="row"><button type="button" data-act="openRecipes">📖 Recipe Guide · '+RECIPES.length+' Mechs</button></div>';
   panel.innerHTML = h;
@@ -2692,7 +2695,7 @@ panel.addEventListener('click', (e) => {
     case 'keep': doKeep(sel); break;
     case 'combine': doCombine(sel, pieces.get(+b.dataset.q)); break;
     case 'combineFour': doCombineFour(sel); break;
-    case 'forge': forgeRecipe(sel,+b.dataset.recipe,S.phase==='choose'); break;
+    case 'forge': forgeRecipe(sel,+b.dataset.recipe,false); break;
     case 'finishForge': finishChoose(); break;
     case 'upgradeSpecial': upgradeSpecial(sel); break;
     case 'buy': buyOdds(); break;
@@ -2761,7 +2764,7 @@ window.__krogoth = {
 
 <script>
 /* Keep installed and browser versions in sync; the badge can force a fresh check. */
-const KROGOTH_VERSION='0.30.0';
+const KROGOTH_VERSION='0.32.0';
 async function krogothCheckUpdate(){
   const tag=document.getElementById('versionTag');
   if(tag){tag.querySelector('.ver-number').textContent='Checking…';tag.disabled=true;}
@@ -2781,6 +2784,6 @@ async function krogothCheckUpdate(){
 }
 document.getElementById('versionTag').addEventListener('click',krogothCheckUpdate);
 if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=31',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
+  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=32',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
 }
 </script>
