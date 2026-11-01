@@ -204,7 +204,7 @@ button.warn { border-color: var(--red); color: var(--red); }
 <div id="app">
   <canvas id="cv" aria-label="Krogoth game field"></canvas>
   <header id="hud">
-    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.40.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
+    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.41.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
     <div class="stat"><span class="lbl">Wave</span><b id="hWave">1</b></div>
     <div class="stat lives"><span class="lbl">Lives</span><b id="hLives">20</b></div>
     <div class="stat gold"><span class="lbl">Gold</span><b id="hGold">10</b></div>
@@ -1087,6 +1087,53 @@ function sprWarlord(f) {
   P.set(6,8,E[0]);P.set(9,8,E[0]);
   return P.done();
 }
+// Three independent 24x24 four-frame boss sprite sheets, drawn pixel-by-pixel.
+function sprSiegeBreaker(f){
+ const P=painter(24,24),B=(x,y,w,h,c)=>{for(let j=y;j<y+h;j++)for(let i=x;i<x+w;i++)P.set(i,j,c);};
+ const d=f%4,steel='#596776',light='#9aaab4',dark='#25313c',rust='#a45a36',hot='#ffb451';
+ // Six wide armoured tank treads, shifting track teeth.
+ for(const x of [1,18]){B(x,9,5,12,'#151e27');B(x+1,10,3,10,steel);for(let y=11;y<20;y+=3)B(x,y+(d%2),5,1,dark);}
+ B(4,8,16,12,dark);B(5,7,14,10,steel);B(6,7,12,2,light);B(7,11,10,6,'#394855');
+ B(8,4,8,9,'#293741');B(9,3,6,7,'#6e7d88');B(10,4,4,3,'#c5cbd0');
+ B(11,0,2,7,'#151b22');B(11,1,2,4,'#b87a43');B(11,0,2,1,hot);
+ for(const x of [5,16]){B(x,5,3,4,'#222e38');B(x+1,6,1,2,rust);}
+ B(9,13,6,3,'#171f27');B(10,13,4,2,d%2?hot:'#d96531');
+ for(let x=7;x<18;x+=3)B(x,18,2,2,'#8a9497');
+ return P.done();
+}
+function sprBroodEngine(f){
+ const P=painter(24,24),B=(x,y,w,h,c)=>{for(let j=y;j<y+h;j++)for(let i=x;i<x+w;i++)P.set(i,j,c);};
+ const d=f%4,limb='#4a6660',edge='#8cb0a0',dark='#1a2929',acid='#b8f16e';
+ // Articulated arachnid legs; each frame alters alternating joints.
+ for(let k=0;k<4;k++)for(const side of [-1,1]){
+  const sy=5+k*4,xx=side<0?4:19,step=((k+d)%2);
+  B(xx,sy,2,2,limb);B(xx+side*3,sy-2+step,4,2,edge);
+  B(xx+side*5,sy+step,2,4,dark);B(xx+side*5,sy+3+step,3,1,limb);
+ }
+ B(6,7,12,12,dark);B(7,6,10,12,limb);B(8,7,8,10,'#5f8275');
+ B(9,4,6,6,'#304d49');B(10,3,4,4,edge);
+ B(9,10,6,5,'#233e3b');B(10,11,4,3,d%2?'#dcff91':acid);
+ for(const x of [8,15]){B(x,7,2,2,'#c8f78d');B(x,8,1,1,'#ffffff');}
+ B(10,17,4,3,'#263e36');B(11,18,2,2,'#8db84d');
+ for(let x=8;x<17;x+=3)B(x,20,2,1,'#82a96b');
+ return P.done();
+}
+function sprDreadCarrier(f){
+ const P=painter(24,24),B=(x,y,w,h,c)=>{for(let j=y;j<y+h;j++)for(let i=x;i<x+w;i++)P.set(i,j,c);};
+ const d=f%4,purple='#866ab0',metal='#58657e',light='#aeb6d4',dark='#25283f',glow=d%2?'#f0b5ff':'#b48aff';
+ // Broad flying cruiser silhouette with articulated wing-tip turbines.
+ B(8,3,8,17,dark);B(9,2,6,16,metal);B(10,1,4,14,light);
+ for(const side of [-1,1]){
+  const x=side<0?1:17;
+  B(x,8,6,8,dark);B(x+1,7,5,7,metal);B(x+2,8,3,2,purple);
+  B(x+1,15,4,4,'#1c2338');B(x+2,16,2,3,glow);
+  B(x+2,5+(d%2),2,3,'#3b415e');
+ }
+ B(9,7,6,7,'#222a44');B(10,8,4,5,purple);B(11,9,2,3,glow);
+ B(10,17,4,4,'#20263b');B(11,19,2,3,glow);
+ for(let x=5;x<20;x+=4)B(x,12,2,1,'#b0a2c7');
+ return P.done();
+}
 function whiten(spr) {
   const c = document.createElement('canvas'); c.width = spr.c.width; c.height = spr.c.height;
   const g = c.getContext('2d');
@@ -1106,6 +1153,9 @@ function buildSprites() {
     fast: [0,1,2,3].map(sprRunner),
     air: [0,1,2,3].map(sprHornet),
     boss: [0,1,2,3].map(sprWarlord),
+    bossSiege:[0,1,2,3].map(sprSiegeBreaker),
+    bossBrood:[0,1,2,3].map(sprBroodEngine),
+    bossCarrier:[0,1,2,3].map(sprDreadCarrier),
   };
   SPRITES.enemyW = {};
   for (const k in SPRITES.enemy) SPRITES.enemyW[k] = SPRITES.enemy[k].map(whiten);
@@ -2395,9 +2445,10 @@ function drawPiece(p, t) {
 
 function drawEnemy(e, t) {
   const fr = Math.abs(Math.floor((e.air ? t * 13 : e.prog * (e.kind === 'fast' ? 9 : e.kind === 'boss' ? 3.8 : 6.5)) + e.ph)) % 4;
-  const spr = (e.flash > 0 ? SPRITES.enemyW : SPRITES.enemy)[e.kind][fr];
+  const spriteKind=e.kind==='boss'?['bossSiege','bossBrood','bossCarrier'][e.bossVariant??0]:e.kind;
+  const spr = (e.flash > 0 ? SPRITES.enemyW : SPRITES.enemy)[spriteKind][fr];
   const img = spr.c || spr;
-  const size = e.kind === 'boss' ? 2.2 : (e.air ? 1.35 : (e.kind === 'fast' ? 1.25 : 1.3));
+  const size = e.kind === 'boss' ? (e.bossVariant===2?3.25:2.85) : (e.air ? 1.35 : (e.kind === 'fast' ? 1.25 : 1.3));
   const gaitPhase = t * (e.kind === 'fast' ? 17 : e.kind === 'boss' ? 5.2 : 9) + e.ph;
   const lift = e.air ? 0.95 + Math.sin(t * 4 + e.ph) * 0.12 : (e.frozen > 0 ? 0 : Math.abs(Math.sin(gaitPhase)) * (e.kind === 'fast' ? 0.085 : e.kind === 'boss' ? 0.028 : 0.045));
   const foot = e.y;
@@ -2406,14 +2457,14 @@ function drawEnemy(e, t) {
   ellipse(e.x, foot - 0.06, size * 0.36, size * 0.12);
   ctx.save();
   ctx.translate(e.x, foot - lift);
-  if (!e.air && e.frozen <= 0) ctx.rotate(Math.sin(gaitPhase) * (e.kind === 'fast' ? 0.065 : e.kind === 'boss' ? 0.014 : 0.027));
+  if (!e.air && e.frozen <= 0 && e.kind!=='boss') ctx.rotate(Math.sin(gaitPhase) * (e.kind === 'fast' ? 0.065 : e.kind === 'boss' ? 0.014 : 0.027));
   if (e.dir < 0) ctx.scale(-1, 1);
   ctx.drawImage(img, -size / 2, -size, size, size);
   ctx.restore();
   // Enemy silhouettes gain articulated legs, layered armour and distinct attack lighting.
   ctx.save();
   const gait=e.frozen>0?0:Math.sin(gaitPhase);
-  if(!e.air){
+  if(!e.air && e.kind!=='boss'){
     const legY=foot-0.12;
     for(const side of [-1,1]){
       const lx=e.x+side*size*0.28;
@@ -2428,7 +2479,7 @@ function drawEnemy(e, t) {
     }else if(e.kind==='fast'){
       ctx.fillStyle='#a9c4d0';ctx.fillRect(e.x-0.29,top+0.3,0.12,0.07);ctx.fillRect(e.x+0.17,top+0.3,0.12,0.07);
     }
-  }else{
+  }else if(e.air){
     const wing=Math.sin(t*12+e.ph)*0.18;
     ctx.fillStyle='#263443';ctx.fillRect(e.x-0.58,top+0.35+wing,0.3,0.11);
     ctx.fillRect(e.x+0.28,top+0.35-wing,0.3,0.11);
@@ -2904,7 +2955,7 @@ window.__krogoth = {
 
 <script>
 /* Keep installed and browser versions in sync; the badge can force a fresh check. */
-const KROGOTH_VERSION='0.40.0';
+const KROGOTH_VERSION='0.41.0';
 async function krogothCheckUpdate(){
   const tag=document.getElementById('versionTag');
   if(tag){tag.querySelector('.ver-number').textContent='Checking…';tag.disabled=true;}
@@ -2924,6 +2975,6 @@ async function krogothCheckUpdate(){
 }
 document.getElementById('versionTag').addEventListener('click',krogothCheckUpdate);
 if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=40',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
+  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=41',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
 }
 </script>
