@@ -204,7 +204,7 @@ button.warn { border-color: var(--red); color: var(--red); }
 <div id="app">
   <canvas id="cv" aria-label="Krogoth game field"></canvas>
   <header id="hud">
-    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.43.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
+    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.44.0</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
     <div class="stat"><span class="lbl">Wave</span><b id="hWave">1</b></div>
     <div class="stat lives"><span class="lbl">Lives</span><b id="hLives">20</b></div>
     <div class="stat gold"><span class="lbl">Gold</span><b id="hGold">10</b></div>
@@ -1237,9 +1237,72 @@ function sprBasic32(mi,tier){
  }
  return P.done();
 }
+// 64x64 native finishing renderer: 32px silhouettes serve only as a geometry
+// guide; surface plates, bevels, greebles, specular pixels and weapon detailing
+// are individually rasterised at 64px, with the original camera angle intact.
+function sprBasic64(mi,tier){
+ const base=sprBasic32(mi,tier),out=document.createElement('canvas');
+ out.width=64;out.height=64;
+ const g=out.getContext('2d',{willReadFrequently:true});g.imageSmoothingEnabled=false;
+ g.drawImage(base.c,0,0,64,64);
+ const im=g.getImageData(0,0,64,64),a=im.data,C=METALS[mi].c;
+ const solid=(x,y)=>x>=0&&y>=0&&x<64&&y<64&&a[(y*64+x)*4+3]>0;
+ const dot=(x,y,c)=>{if(solid(x,y)){g.fillStyle=c;g.fillRect(x,y,1,1);}};
+ const line=(x,y,w,h,c)=>{g.fillStyle=c;for(let j=y;j<y+h;j++)for(let i=x;i<x+w;i++)if(solid(i,j))g.fillRect(i,j,1,1);};
+ // Rebuild the edge treatment at single-pixel resolution, retaining crisp geometry.
+ for(let y=3;y<61;y++)for(let x=3;x<61;x++){
+  if(!solid(x,y))continue;
+  if(!solid(x,y-1)&&solid(x,y+1))dot(x,y,'rgba(235,244,252,0.54)');
+  else if(!solid(x-1,y)&&solid(x+1,y))dot(x,y,'rgba(204,220,235,0.40)');
+  else if(!solid(x+1,y)&&solid(x-1,y))dot(x,y,'rgba(9,14,21,0.58)');
+  else if(!solid(x,y+1)&&solid(x,y-1))dot(x,y,'rgba(9,14,21,0.43)');
+ }
+ // Fine panel segmentation and metal texture: deterministic, not animated noise.
+ for(let y=10;y<57;y+=5)for(let x=9;x<55;x+=7){
+  if(solid(x,y)&&solid(x+3,y)&&solid(x,y+2)){
+   line(x,y,4,1,'rgba(12,21,29,0.36)');
+   dot(x+1,y+1,'rgba(216,230,241,0.58)');
+   dot(x+3,y+2,'rgba(5,12,19,0.58)');
+  }
+ }
+ // Material-specific microscopic machinery at true 64px resolution.
+ const k=METALS[mi].k;
+ if(k==='iron'){
+  for(const x of [23,37]){line(x,14,4,15,'#35414d');line(x+1,15,1,12,'#aebbc7');line(x,14,3,2,'#151b22');}
+  for(const y of [33,39,45])for(const x of [15,48])dot(x,y,'#c1ccd6');
+ }else if(k==='copper'){
+  for(let y=17;y<45;y+=4){line(25,y,14,1,C[3]);line(26,y+1,12,1,'#513025');}
+  for(const x of [15,48]){dot(x,14,'#c9ffff');dot(x+1,13,'#72ddff');}
+ }else if(k==='cobalt'){
+  for(const x of [20,42]){line(x,18,2,22,'#d8f7ff');for(let y=23;y<43;y+=5)dot(x+3,y,'#82d9ff');}
+  line(30,25,4,17,'#8dd6f4');
+ }else if(k==='uranium'){
+  for(let y=22;y<43;y+=3){line(29,y,6,1,'rgba(238,255,188,0.76)');}
+  for(const x of [18,46])for(const y of [25,37])dot(x,y,'#c7e7a1');
+ }else if(k==='tungsten'){
+  for(const x of [26,37])line(x,10,1,28,'#9c8caa');
+  line(31,5,2,30,'#f177a0');for(const y of [18,25,32])line(25,y,14,1,'#5c536c');
+ }else if(k==='gold'){
+  for(let x=18;x<47;x+=3)dot(x,13,'#fff2b8');
+  for(const y of [30,36,42]){line(22,y,20,1,'#f9d86a');}
+ }else if(k==='titanium'){
+  for(const x of [17,44]){line(x,9,2,23,'#e5f0f7');line(x+2,13,1,18,'#667b8c');}
+  for(const y of [35,40])line(26,y,12,1,'#e4f5ff');
+ }
+ // Progressive 64px-exclusive hardware: visible rivets and power indicators.
+ for(const x of [13,50])for(const y of [49,54]){dot(x,y,'#dce6ec');dot(x+1,y+1,'#101a22');}
+ if(tier>=2)for(const x of [11,52])for(const y of [38,43])dot(x,y,C[3]);
+ if(tier>=3)for(const x of [19,43])for(const y of [46,49]){dot(x,y,'#f7fcff');dot(x+1,y,C[3]);}
+ if(tier>=4)for(const y of [26,30,34]){line(10,y,3,1,C[3]);line(51,y,3,1,C[3]);}
+ if(tier===5){for(let x=21;x<=43;x+=4)dot(x,52,'#fff7e5');line(29,3,6,1,'#fff5d7');}
+ // Generate actual 64px mask for sparkle coordinates.
+ const mask=[];const result=g.getImageData(0,0,64,64).data;
+ for(let y=0;y<64;y++)for(let x=0;x<64;x++)if(result[(y*64+x)*4+3]>0)mask.push([x,y]);
+ return {c:out,mask};
+}
 const SPRITES = {};
 function buildSprites() {
-  SPRITES.piece = METALS.map((_, mi) => [1,2,3,4,5].map(tier=>sprBasic32(mi,tier)).concat([[sprMech(mi, 0), sprMech(mi, 1)]]));
+  SPRITES.piece = METALS.map((_, mi) => [1,2,3,4,5].map(tier=>sprBasic64(mi,tier)).concat([[sprMech(mi, 0), sprMech(mi, 1)]]));
   SPRITES.scrap = [sprScrap(0), sprScrap(1), sprScrap(2)];
   SPRITES.plinth = sprPlinth();
   SPRITES.enemy = {
@@ -2371,9 +2434,10 @@ function drawPiece(p, t) {
   const glint=Math.sin(t*2.7*sp+ph);
   if(glint>0.91 && spr.mask.length){
     const [gx,gy]=spr.mask[(Math.floor(ph*23)+tier*11)%spr.mask.length];
+    const spriteResolution=spr.c.width, spritePx=size/spriteResolution;
     ctx.save();ctx.globalAlpha=(glint-0.91)/0.09*0.8;
     ctx.fillStyle='#ffffff';
-    ctx.fillRect(ix+(flip?15-gx:gx)*ps,iy+gy*ps,ps,ps);
+    ctx.fillRect(ix+(flip?spriteResolution-1-gx:gx)*spritePx,iy+gy*spritePx,spritePx,spritePx);
     ctx.restore();
   }
   // Grounded mechanical bodywork: polished edge lights and subtle active core.
@@ -3049,7 +3113,7 @@ window.__krogoth = {
 
 <script>
 /* Keep installed and browser versions in sync; the badge can force a fresh check. */
-const KROGOTH_VERSION='0.43.0';
+const KROGOTH_VERSION='0.44.0';
 async function krogothCheckUpdate(){
   const tag=document.getElementById('versionTag');
   if(tag){tag.querySelector('.ver-number').textContent='Checking…';tag.disabled=true;}
@@ -3069,6 +3133,6 @@ async function krogothCheckUpdate(){
 }
 document.getElementById('versionTag').addEventListener('click',krogothCheckUpdate);
 if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=43',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
+  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=44',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
 }
 </script>
