@@ -205,7 +205,7 @@ button.warn { border-color: var(--red); color: var(--red); }
 <div id="app">
   <canvas id="cv" aria-label="Krogoth game field"></canvas>
   <header id="hud">
-    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.45.3</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
+    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.45.4</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
     <div class="stat"><span class="lbl">Wave</span><b id="hWave">1</b></div>
     <div class="stat lives"><span class="lbl">Lives</span><b id="hLives">20</b></div>
     <div class="stat gold"><span class="lbl">Gold</span><b id="hGold">10</b></div>
@@ -2610,7 +2610,7 @@ function drawPiece(p, t) {
     ctx.fillRect(ix + 1 + Math.cos(a) * 0.72 - ps / 2, iy + 1 + Math.sin(a) * 0.45 - ps / 2, ps, ps);
   }
   if (mech) {
-    if (((t * sp + ph) % 3.2) < 0.13) { ctx.fillStyle = '#1b1e23'; for (const [ex, ey] of spr.eye) ctx.fillRect(ix + (flip ? 15 - ex : ex) * ps, iy + ey * ps, ps, ps); }
+    if (((t * sp + ph) % 3.2) < 0.13 && Array.isArray(spr.eye)) { ctx.fillStyle = '#1b1e23'; const eyePx=size/spr.c.width; for (const [ex, ey] of spr.eye) ctx.fillRect(ix + (flip ? spr.c.width-1-ex : ex) * eyePx, iy + ey * eyePx, eyePx, eyePx); }
     for (let i = 0; i < 2; i++) {
       const life = (t * 0.6 * sp + ph + i * 0.5) % 1;
       ctx.fillStyle = 'rgba(190,196,204,' + (0.55 * (1 - life)) + ')';
@@ -3230,6 +3230,6 @@ async function krogothCheckUpdate(){
 }
 document.getElementById('versionTag').addEventListener('click',krogothCheckUpdate);
 if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=453',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
+  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=454',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
 }
 </script>
