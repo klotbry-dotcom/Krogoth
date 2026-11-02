@@ -205,7 +205,7 @@ button.warn { border-color: var(--red); color: var(--red); }
 <div id="app">
   <canvas id="cv" aria-label="Krogoth game field"></canvas>
   <header id="hud">
-    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.45.2</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
+    <button id="versionTag" type="button" title="Check for the latest Krogoth update" aria-label="Version 0.14.0, tap to check for updates"><span class="ver-mark">K</span><span class="ver-number">v0.45.3</span><span class="ver-refresh" aria-hidden="true">↻</span></button>
     <div class="stat"><span class="lbl">Wave</span><b id="hWave">1</b></div>
     <div class="stat lives"><span class="lbl">Lives</span><b id="hLives">20</b></div>
     <div class="stat gold"><span class="lbl">Gold</span><b id="hGold">10</b></div>
@@ -409,6 +409,7 @@ function newGame() {
     effects: [], texts: [], proj: [], dust: makeDust(), shake: 0, legs: null,
     countdown: 0, anim: 0, kills: 0, over: false,
   };
+  pendingReroutes=[];
   setRoute(routeFrom(SPAWN, 1));
   renderPanel();
 }
@@ -491,17 +492,26 @@ function routeFrom(start, leg) {
 }
 function fullPath() { const r = routeFrom(SPAWN, 1); return r ? r.nodes : null; }
 function setRoute(r) { S.path = r ? r.nodes : null; S.legs = r ? r.legs : null; }
+// Route updates are queued instead of recalculating every active enemy in
+// one synchronous click handler. One enemy is handled per animation frame.
+let pendingReroutes=[],rerouteGeneration=0;
 function rerouteGround() {
-  for (const e of S.enemies) {
-    if (!e.alive || e.air || e.i >= e.nodes.length - 1) continue;
-    const r = routeFrom(e.nodes[e.i + 1], e.legs[e.i + 1]);
-    if (!r) continue;
-    e.nodes = [e.nodes[e.i]].concat(r.nodes);
-    e.legs = [e.legs[e.i]].concat(r.legs);
-    e.pts = e.nodes.map(pathPoint);
-    e.pts[0] = [e.x, e.y];
-    e.i = 0;
-  }
+  rerouteGeneration++;
+  pendingReroutes=S.enemies.filter(e=>e.alive&&!e.air);
+}
+function processPendingReroutes(){
+  if(!pendingReroutes.length)return;
+  const e=pendingReroutes.shift();
+  if(!e.alive||e.air||e.i>=e.nodes.length-1)return;
+  const next=e.nodes[e.i+1],leg=e.legs[e.i+1];
+  if(!next||leg==null)return;
+  const r=routeFrom(next,leg);
+  if(!r)return;
+  e.nodes=[e.nodes[e.i]].concat(r.nodes);
+  e.legs=[e.legs[e.i]].concat(r.legs);
+  e.pts=e.nodes.map(pathPoint);
+  e.pts[0]=[e.x,e.y];
+  e.i=0;
 }
 function makeDust() {
   const d = [];
@@ -3159,8 +3169,10 @@ function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   S.anim += dt;
+  // Process queued route updates incrementally; never all on one click.
   // A gameplay/render exception must not permanently stop requestAnimationFrame.
   try {
+    processPendingReroutes();
     for (let i = 0; i < S.speed; i++) update(dt);
     render();
     updHud();
@@ -3198,7 +3210,7 @@ window.__krogoth = {
 
 <script>
 /* Keep installed and browser versions in sync; the badge can force a fresh check. */
-const KROGOTH_VERSION='0.45.2';
+const KROGOTH_VERSION='0.45.3';
 async function krogothCheckUpdate(){
   const tag=document.getElementById('versionTag');
   if(tag){tag.querySelector('.ver-number').textContent='Checking…';tag.disabled=true;}
@@ -3218,6 +3230,6 @@ async function krogothCheckUpdate(){
 }
 document.getElementById('versionTag').addEventListener('click',krogothCheckUpdate);
 if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=452',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
+  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=453',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
 }
 </script>
