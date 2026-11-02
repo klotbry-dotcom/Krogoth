@@ -3051,6 +3051,7 @@ function renderPanel() {
       }
       h += '<button type="button" data-act="deselect">Close</button></div>';
       if(sel.kind==='tower'&&!sel.isNew&&sel.special==null&&!sel.god)for(const opt of availableRecipes(sel))h+='<div class="row"><button type="button" class="primary" data-act="forge" data-recipe="'+opt.i+'">Forge '+esc(opt.r.name)+'</button></div>';
+      if(sel.kind==='tower'&&sel.special!=null)h+='<div class="row"><button type="button" class="primary" data-act="upgradeSpecial"'+((sel.upgrade||0)>=5||S.gold<specialCost(sel)?' disabled':'')+'>' + ((sel.upgrade||0)>=5?'Fully upgraded':'Upgrade special · '+specialCost(sel)+' gold')+'</button></div>';
     } else {
       const len = S.path ? Math.round(pathLength(S.path)) : 0;
       h += '<div class="hint">Piece ' + (S.placed + 1) + ' of 5. Tap an open spot on the floor. <span class="dim">Route length ' + len + '.</span></div>';
@@ -3210,7 +3211,7 @@ window.__krogoth = {
 
 <script>
 /* Keep installed and browser versions in sync; the badge can force a fresh check. */
-const KROGOTH_VERSION='0.45.3';
+const KROGOTH_VERSION='0.45.5';
 async function krogothCheckUpdate(){
   const tag=document.getElementById('versionTag');
   if(tag){tag.querySelector('.ver-number').textContent='Checking…';tag.disabled=true;}
@@ -3230,6 +3231,6 @@ async function krogothCheckUpdate(){
 }
 document.getElementById('versionTag').addEventListener('click',krogothCheckUpdate);
 if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=454',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
+  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=455',{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn));
 }
 </script>
